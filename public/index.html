@@ -51,7 +51,7 @@
     th[data-sort]::after { content: '\00a0\00a0'; }
     th[data-sort][data-dir="asc"]::after  { content: ' \2191'; }
     th[data-sort][data-dir="desc"]::after { content: ' \2193'; }
-    th[data-sort]:hover { background-color: rgba(255,255,255,0.2); }
+    th[data-sort]:hover { --bs-table-accent-bg: rgba(255,255,255,0.2); }
     /* Fixed column widths for GA table */
     #ga-table { table-layout: fixed; }
     #ga-table col.col-addr    { width: 7rem; }
