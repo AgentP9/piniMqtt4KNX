@@ -289,6 +289,24 @@
     `).join('');
   }
 
+  /** Update the Last Value cell for a GA row without re-rendering the whole table. */
+  function updateGALastValue(entry) {
+    // Find the row whose first cell contains the matching address
+    const rows = document.getElementById('ga-body').rows;
+    for (const row of rows) {
+      const codeEl = row.cells[0] && row.cells[0].querySelector('code');
+      if (codeEl && codeEl.textContent === entry.address) {
+        // Update the in-memory GA object so modal edits reflect current DPT
+        const ga = configuredGAs.find((g) => g.address === entry.address);
+        if (ga) ga.lastValue = entry.value;
+        // Update the cell (column index 4)
+        const cell = row.cells[4];
+        if (cell) cell.innerHTML = `<strong>${escHtml(formatValue(entry.value, entry.dpt))}</strong>`;
+        break;
+      }
+    }
+  }
+
   // Delegate edit / delete clicks in the GA table
   document.getElementById('ga-body').addEventListener('click', (e) => {
     const editBtn   = e.target.closest('.btn-edit-ga');
@@ -359,6 +377,7 @@
   socket.on('traffic', (entry) => {
     appendRow(entry);
     updateCounters(entry);
+    if (entry.configured !== false) updateGALastValue(entry);
   });
 
   socket.on('status', ({ service, connected }) => updateBadge(service, connected));
