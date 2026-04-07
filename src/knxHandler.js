@@ -17,8 +17,8 @@ function decodeKnxValue(rawValue, dpt) {
 
   const major = dpt.split('.')[0];
   switch (major) {
-    case '1': // DPT1 – boolean (1 bit)
-      return String(buf[buf.length - 1] & 0x01);
+    case '1': // DPT1 – boolean (1 bit) → ON / OFF
+      return (buf[buf.length - 1] & 0x01) ? 'ON' : 'OFF';
 
     case '5': // DPT5 – unsigned 8-bit integer
       return String(buf[0]);
@@ -49,7 +49,7 @@ function encodeKnxValue(value, dpt) {
 
   switch (major) {
     case '1':
-      return value === 'true' || value === '1' ? 1 : 0;
+      return value === 'true' || value === '1' || value === 'ON' ? 1 : 0;
     case '5':
       return isNaN(num) ? 0 : Math.min(255, Math.max(0, Math.round(num)));
     case '9':

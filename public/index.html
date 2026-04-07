@@ -57,11 +57,12 @@
                   <th>Name</th>
                   <th>DPT</th>
                   <th>Comment</th>
+                  <th>Last Value</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody id="ga-body">
-                <tr><td colspan="5" class="text-center empty-msg p-3">Loading…</td></tr>
+                <tr><td colspan="6" class="text-center empty-msg p-3">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -190,6 +191,26 @@
       .replace(/"/g, '&quot;');
   }
 
+  /** Format a decoded value for display, adding units based on DPT. */
+  function formatValue(value, dpt) {
+    if (!dpt) return String(value);
+    const [major, minor] = String(dpt).split('.');
+    if (major === '1') return value; // already ON/OFF from server
+    if (major === '9') {
+      const unit = minor === '001' ? ' °C'
+                 : minor === '002' ? ' K'
+                 : minor === '003' ? ' °C/h'
+                 : minor === '004' ? ' lux'
+                 : minor === '005' ? ' m/s'
+                 : minor === '006' ? ' Pa'
+                 : minor === '007' ? ' %'
+                 : minor === '008' ? ' ppm'
+                 : '';
+      return value + unit;
+    }
+    return String(value);
+  }
+
   // ── Counters ─────────────────────────────────────────────────────────────────
   let total = 0, knx2mqtt = 0, mqtt2knx = 0;
 
@@ -200,7 +221,7 @@
     document.getElementById('cnt-total').textContent    = total;
     document.getElementById('cnt-knx2mqtt').textContent = knx2mqtt;
     document.getElementById('cnt-mqtt2knx').textContent = mqtt2knx;
-    document.getElementById('cnt-last-val').textContent = entry.value;
+    document.getElementById('cnt-last-val').textContent = formatValue(entry.value, entry.dpt);
   }
 
   // ── Traffic rows ──────────────────────────────────────────────────────────────
@@ -222,7 +243,7 @@
         <br><small class="text-muted">${escHtml(entry.address)}</small>
       </td>
       <td><code>${escHtml(entry.topic)}</code></td>
-      <td><strong>${escHtml(String(entry.value))}</strong></td>
+      <td><strong>${escHtml(formatValue(String(entry.value), entry.dpt))}</strong></td>
       <td>${!isConf ? '<button class="btn btn-sm btn-outline-primary btn-add-from-traffic" data-address="' + escHtml(entry.address) + '">+ Add</button>' : ''}</td>
     `;
     tbody.prepend(tr);
@@ -250,7 +271,7 @@
     configuredGAs = addresses;
     const gaBody = document.getElementById('ga-body');
     if (!addresses.length) {
-      gaBody.innerHTML = '<tr><td colspan="5" class="text-center empty-msg p-3">No group addresses configured.</td></tr>';
+      gaBody.innerHTML = '<tr><td colspan="6" class="text-center empty-msg p-3">No group addresses configured.</td></tr>';
       return;
     }
     gaBody.innerHTML = addresses.map((ga) => `
@@ -259,6 +280,7 @@
         <td>${escHtml(ga.name || '')}</td>
         <td><small>${escHtml(ga.dpt || '')}</small></td>
         <td><small class="text-muted">${escHtml(ga.comment || '')}</small></td>
+        <td><strong>${escHtml(ga.lastValue !== undefined && ga.lastValue !== null ? formatValue(ga.lastValue, ga.dpt) : '–')}</strong></td>
         <td class="text-end text-nowrap">
           <button class="btn btn-sm btn-outline-secondary btn-edit-ga me-1" data-address="${escHtml(ga.address)}">Edit</button>
           <button class="btn btn-sm btn-outline-danger btn-delete-ga"       data-address="${escHtml(ga.address)}">Delete</button>

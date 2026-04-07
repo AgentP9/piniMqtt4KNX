@@ -32,6 +32,7 @@ knxHandler.on('groupValueWrite', ({ address, src, value, name }) => {
     name: name || address,
     topic,
     value: String(value),
+    dpt: ga ? ga.dpt : undefined,
     src,
     configured,
     timestamp: new Date().toISOString(),
@@ -60,6 +61,7 @@ mqttHandler.on('message', ({ topic, value }) => {
     name: ga.name || address,
     topic,
     value,
+    dpt: ga.dpt,
     configured: true,
     timestamp: new Date().toISOString(),
   });

@@ -49,7 +49,7 @@ class WebServer {
       }
 
       if (this._saveGroupAddresses()) {
-        this.io.emit('groupaddresses', this.groupAddresses);
+        this.io.emit('groupaddresses', this._enrichGAs());
         return res.json(entry);
       }
 
@@ -70,7 +70,7 @@ class WebServer {
 
       const [removed] = this.groupAddresses.splice(idx, 1);
       if (this._saveGroupAddresses()) {
-        this.io.emit('groupaddresses', this.groupAddresses);
+        this.io.emit('groupaddresses', this._enrichGAs());
         return res.json({ ok: true });
       }
 
@@ -85,6 +85,9 @@ class WebServer {
     // Keep a rolling in-memory log (last 200 entries) for late-joining clients
     this._log = [];
 
+    // Last received value per group address (address → value string)
+    this._lastValues = {};
+
     this.io.on('connection', (socket) => {
       console.log('[WEB] Client connected');
       // Send existing log and current state to the new client
@@ -92,7 +95,7 @@ class WebServer {
       Object.entries(this._status).forEach(([service, connected]) => {
         socket.emit('status', { service, connected });
       });
-      socket.emit('groupaddresses', this.groupAddresses);
+      socket.emit('groupaddresses', this._enrichGAs());
       socket.on('disconnect', () => console.log('[WEB] Client disconnected'));
     });
 
@@ -100,6 +103,10 @@ class WebServer {
     eventEmitter.on('traffic', (entry) => {
       this._log.push(entry);
       if (this._log.length > 200) this._log.shift();
+      // Track last value for configured group addresses
+      if (entry.configured !== false) {
+        this._lastValues[entry.address] = entry.value;
+      }
       this.io.emit('traffic', entry);
     });
 
@@ -111,6 +118,14 @@ class WebServer {
 
     this.server.listen(port, () => {
       console.log(`[WEB] Dashboard available at http://localhost:${port}`);
+    });
+  }
+
+  /** Merge last-known values into the GA list before sending to clients. */
+  _enrichGAs() {
+    return this.groupAddresses.map((ga) => {
+      const lastValue = this._lastValues[ga.address];
+      return lastValue !== undefined ? { ...ga, lastValue } : { ...ga };
     });
   }
 
