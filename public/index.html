@@ -405,7 +405,7 @@
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlText, 'text/xml');
     const parseErr = doc.querySelector('parsererror');
-    if (parseErr) throw new Error('Invalid XML: ' + parseErr.textContent.trim().split('\n')[0]);
+    if (parseErr) throw new Error('Invalid XML: ' + (parseErr.textContent.trim().split('\n')[0] || 'parse error'));
     const results = [];
     doc.querySelectorAll('GroupAddress').forEach((el) => {
       const address = el.getAttribute('Address') || '';
