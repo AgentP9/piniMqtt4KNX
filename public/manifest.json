@@ -1,0 +1,16 @@
+{
+  "name": "piniMqtt4KNX – Dashboard",
+  "short_name": "piniMqtt4KNX",
+  "description": "KNX ↔ MQTT bridge dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#212529",
+  "theme_color": "#212529",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
