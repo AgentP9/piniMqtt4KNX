@@ -70,6 +70,8 @@ class KnxHandler extends EventEmitter {
     this.groupAddresses = groupAddresses;
     this.connection = null;
     this.connected = false;
+    // Track addresses the bridge itself wrote recently to suppress the bus echo
+    this._recentWrites = new Set();
     this._connect();
   }
 
@@ -96,6 +98,12 @@ class KnxHandler extends EventEmitter {
         },
         event: (evt, src, dest, rawValue) => {
           if (evt !== 'GroupValue_Write') return;
+
+          // Suppress echo: ignore writes the bridge itself sent to the bus
+          if (this._recentWrites.has(dest)) {
+            console.log(`[KNX] ${evt} src=${src} dest=${dest} – echo suppressed`);
+            return;
+          }
 
           const ga = this._findGA(dest);
           const value = decodeKnxValue(rawValue, ga && ga.dpt);
@@ -132,6 +140,10 @@ class KnxHandler extends EventEmitter {
         this.connection.write(address, value);
       }
       console.log(`[KNX] Write ${address} = ${value}`);
+
+      // Mark address as recently written so the bus echo is suppressed
+      this._recentWrites.add(address);
+      setTimeout(() => this._recentWrites.delete(address), 500);
     } catch (err) {
       console.error('[KNX] Write error:', err.message);
     }
