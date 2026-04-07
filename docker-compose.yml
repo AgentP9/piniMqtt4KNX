@@ -1,9 +1,9 @@
 version: "3.8"
 
 services:
-  piniMqtt4KNX:
+  pinimqtt4knx:
     build: .
-    container_name: piniMqtt4KNX
+    container_name: pinimqtt4knx
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-3000}:3000"
