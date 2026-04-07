@@ -4,6 +4,29 @@ const EventEmitter = require('events');
 const knx = require('knx');
 
 /**
+ * Human-readable label pairs for DPT 1.x sub-types.
+ * Index = DPT minor number; value = [label_for_0, label_for_1].
+ * Entries not listed here fall back to ['OFF', 'ON'].
+ */
+const DPT1_NAMES = {
+   1: ['OFF',           'ON'],
+   2: ['FALSE',         'TRUE'],
+   3: ['DISABLE',       'ENABLE'],
+   4: ['NO RAMP',       'RAMP'],
+   5: ['NO ALARM',      'ALARM'],
+   6: ['LOW',           'HIGH'],
+   7: ['DECREASE',      'INCREASE'],
+   8: ['UP',            'DOWN'],
+   9: ['OPEN',          'CLOSE'],
+  10: ['STOP',          'START'],
+  11: ['INACTIVE',      'ACTIVE'],
+  12: ['NOT INVERTED',  'INVERTED'],
+  17: ['OK',            'OK'],    // trigger – both states mean "trigger"
+  18: ['FREE',          'OCCUPIED'],
+  19: ['CLOSED',        'OPEN'],
+};
+
+/**
  * Decode a raw KNX buffer value according to its DPT.
  * Supported DPT major groups: 1 (boolean), 5 (unsigned byte), 9 (2-byte float).
  * Falls back to a hex string for unknown DPTs.
@@ -15,10 +38,15 @@ function decodeKnxValue(rawValue, dpt) {
     return buf.toString('hex');
   }
 
-  const major = dpt.split('.')[0];
+  const parts = String(dpt).split('.');
+  const major = parts[0];
   switch (major) {
-    case '1': // DPT1 – boolean (1 bit) → ON / OFF
-      return (buf[buf.length - 1] & 0x01) ? 'ON' : 'OFF';
+    case '1': { // DPT1 – boolean (1 bit)
+      const bit = (buf[buf.length - 1] & 0x01);
+      const minor = parts[1] ? parseInt(parts[1], 10) : 1;
+      const pair = DPT1_NAMES[minor] || DPT1_NAMES[1];
+      return bit ? pair[1] : pair[0];
+    }
 
     case '5': // DPT5 – unsigned 8-bit integer
       return String(buf[0]);
@@ -44,12 +72,20 @@ function decodeKnxValue(rawValue, dpt) {
 function encodeKnxValue(value, dpt) {
   if (!dpt) return value;
 
-  const major = dpt.split('.')[0];
+  const parts = String(dpt).split('.');
+  const major = parts[0];
   const num = parseFloat(value);
 
   switch (major) {
-    case '1':
-      return value === 'true' || value === '1' || value === 'ON' ? 1 : 0;
+    case '1': {
+      const minor = parts[1] ? parseInt(parts[1], 10) : 1;
+      const v = String(value).toUpperCase().trim();
+      const pair = DPT1_NAMES[minor] || DPT1_NAMES[1];
+      if (v === pair[1]) return 1;
+      if (v === pair[0]) return 0;
+      // Fallback for common truthy strings
+      return (v === 'TRUE' || v === '1' || v === 'ON') ? 1 : 0;
+    }
     case '5':
       return isNaN(num) ? 0 : Math.min(255, Math.max(0, Math.round(num)));
     case '9':

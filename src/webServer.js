@@ -62,6 +62,36 @@ class WebServer {
       return res.status(500).json({ error: 'Failed to persist configuration' });
     });
 
+    // POST /api/groupaddresses/import – bulk add/update from an ETS XML export
+    this.app.post('/api/groupaddresses/import', (req, res) => {
+      const { addresses } = req.body || {};
+      if (!Array.isArray(addresses)) {
+        return res.status(400).json({ error: 'addresses array is required' });
+      }
+
+      let added = 0, updated = 0;
+      for (const item of addresses) {
+        const { address, name, dpt, comment } = item || {};
+        if (!address) continue;
+        const entry = { address, name: name || '', dpt: dpt || '', comment: comment || '' };
+        const idx = this.groupAddresses.findIndex((g) => g.address === address);
+        if (idx >= 0) {
+          // Merge: keep existing values unless the import provides new ones
+          this.groupAddresses[idx] = { ...this.groupAddresses[idx], ...entry };
+          updated++;
+        } else {
+          this.groupAddresses.push(entry);
+          added++;
+        }
+      }
+
+      if (this._saveGroupAddresses()) {
+        this.io.emit('groupaddresses', this._enrichGAs());
+        return res.json({ ok: true, added, updated });
+      }
+      return res.status(500).json({ error: 'Failed to persist configuration' });
+    });
+
     // DELETE – remove a group address (address may contain slashes, captured by wildcard)
     this.app.delete('/api/groupaddresses/*', (req, res) => {
       const address = decodeURIComponent(req.params[0]);

@@ -23,6 +23,9 @@
     #ga-table td { font-size: 0.9rem; }
     .empty-msg { color: #6c757d; font-style: italic; }
     tr.unconfigured td { color: #6c757d; }
+    tr.known-ga { background-color: rgba(13, 110, 253, 0.07); }
+    th[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; }
+    th[data-sort]:hover { background-color: rgba(255,255,255,0.1); }
   </style>
 </head>
 <body>
@@ -46,17 +49,21 @@
       <div class="card shadow-sm h-100">
         <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
           Configured Group Addresses
-          <button class="btn btn-sm btn-success" id="btn-add-ga">+ Add</button>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" id="btn-import-ga">⬆ Import</button>
+            <input type="file" id="ga-import-file" accept=".xml" class="d-none">
+            <button class="btn btn-sm btn-success" id="btn-add-ga">+ Add</button>
+          </div>
         </div>
         <div class="card-body p-0">
           <div class="table-responsive">
             <table class="table table-sm table-striped mb-0" id="ga-table">
               <thead class="table-dark">
                 <tr>
-                  <th>Address</th>
-                  <th>Name</th>
-                  <th>DPT</th>
-                  <th>Comment</th>
+                  <th data-sort="address" data-label="Address">Address</th>
+                  <th data-sort="name"    data-label="Name">Name</th>
+                  <th data-sort="dpt"     data-label="DPT">DPT</th>
+                  <th data-sort="comment" data-label="Comment">Comment</th>
                   <th>Last Value</th>
                   <th></th>
                 </tr>
@@ -195,7 +202,7 @@
   function formatValue(value, dpt) {
     if (!dpt) return String(value);
     const [major, minor] = String(dpt).split('.');
-    if (major === '1') return value; // already ON/OFF from server
+    if (major === '1') return value; // semantic label already assigned by server
     if (major === '9') {
       const unit = minor === '001' ? ' °C'
                  : minor === '002' ? ' K'
@@ -235,6 +242,7 @@
     const isConf   = entry.configured !== false;
     const tr       = document.createElement('tr');
     if (!isConf) tr.classList.add('unconfigured');
+    else         tr.classList.add('known-ga');
     tr.innerHTML = `
       <td>${escHtml(ts)}</td>
       <td><span class="${dirClass}">${escHtml(entry.direction)}</span></td>
@@ -266,15 +274,27 @@
 
   // ── Group addresses table ─────────────────────────────────────────────────────
   let configuredGAs = [];
+  let sortCol = null;
+  let sortDir = 1; // 1 = asc, -1 = desc
+
+  function sortedGAs() {
+    if (!sortCol) return configuredGAs.slice();
+    return configuredGAs.slice().sort((a, b) => {
+      const av = (a[sortCol] || '').toLowerCase();
+      const bv = (b[sortCol] || '').toLowerCase();
+      return av < bv ? -sortDir : av > bv ? sortDir : 0;
+    });
+  }
 
   function renderGATable(addresses) {
     configuredGAs = addresses;
     const gaBody = document.getElementById('ga-body');
-    if (!addresses.length) {
+    const sorted = sortedGAs();
+    if (!sorted.length) {
       gaBody.innerHTML = '<tr><td colspan="6" class="text-center empty-msg p-3">No group addresses configured.</td></tr>';
       return;
     }
-    gaBody.innerHTML = addresses.map((ga) => `
+    gaBody.innerHTML = sorted.map((ga) => `
       <tr>
         <td><code>${escHtml(ga.address)}</code></td>
         <td>${escHtml(ga.name || '')}</td>
@@ -288,6 +308,28 @@
       </tr>
     `).join('');
   }
+
+  // ── GA table column sorting ───────────────────────────────────────────────────
+  function updateSortIndicators() {
+    document.querySelectorAll('#ga-table thead th[data-sort]').forEach((th) => {
+      const label = th.dataset.label;
+      if (th.dataset.sort === sortCol) {
+        th.textContent = label + (sortDir === 1 ? ' ↑' : ' ↓');
+      } else {
+        th.textContent = label;
+      }
+    });
+  }
+
+  document.querySelectorAll('#ga-table thead th[data-sort]').forEach((th) => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (sortCol === col) { sortDir *= -1; }
+      else { sortCol = col; sortDir = 1; }
+      updateSortIndicators();
+      renderGATable(configuredGAs);
+    });
+  });
 
   /** Update the Last Value cell for a GA row without re-rendering the whole table. */
   function updateGALastValue(entry) {
@@ -343,6 +385,72 @@
   }
 
   document.getElementById('btn-add-ga').addEventListener('click', () => openModal(''));
+
+  // ── ETS XML Import ────────────────────────────────────────────────────────────
+  /**
+   * Convert an ETS DPT string such as "DPST-1-8" or "DPT-1" to the internal
+   * dotted format used by this app ("1.008" or "1.001").
+   */
+  function etsDptToDotted(raw) {
+    if (!raw) return '';
+    const dpst = raw.match(/^DPST-(\d+)-(\d+)$/i);
+    if (dpst) return `${dpst[1]}.${dpst[2].padStart(3, '0')}`;
+    const dpt  = raw.match(/^DPT-(\d+)$/i);
+    if (dpt)  return `${dpt[1]}.001`;
+    return raw; // already in another format – pass through
+  }
+
+  /** Parse an ETS GroupAddress-Export XML string and return an array of GA objects. */
+  function parseETSXml(xmlText) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'text/xml');
+    const parseErr = doc.querySelector('parsererror');
+    if (parseErr) throw new Error('Invalid XML: ' + parseErr.textContent.trim().split('\n')[0]);
+    const results = [];
+    doc.querySelectorAll('GroupAddress').forEach((el) => {
+      const address = el.getAttribute('Address') || '';
+      if (!address) return;
+      results.push({
+        address,
+        name:    el.getAttribute('Name')    || '',
+        dpt:     etsDptToDotted(el.getAttribute('DPTs') || ''),
+        comment: '',
+      });
+    });
+    return results;
+  }
+
+  const importFileInput = document.getElementById('ga-import-file');
+
+  document.getElementById('btn-import-ga').addEventListener('click', () => {
+    importFileInput.value = '';
+    importFileInput.click();
+  });
+
+  importFileInput.addEventListener('change', () => {
+    const file = importFileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      let addresses;
+      try {
+        addresses = parseETSXml(ev.target.result);
+      } catch (err) {
+        alert('Import failed: ' + err.message);
+        return;
+      }
+      if (!addresses.length) { alert('No group addresses found in the file.'); return; }
+      fetch('/api/groupaddresses/import', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ addresses }),
+      })
+        .then((r) => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+        .then((data) => alert(`Import complete: ${data.added} added, ${data.updated} updated.`))
+        .catch((err) => alert('Import failed: ' + err.message));
+    };
+    reader.readAsText(file);
+  });
 
   document.getElementById('btn-save-ga').addEventListener('click', () => {
     const address = addrInput.value.trim();
