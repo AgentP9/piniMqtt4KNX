@@ -11,43 +11,18 @@
     crossorigin="anonymous"
   />
   <style>
-    body {
-      background-color: #f8f9fa;
-    }
-    .navbar-brand img {
-      height: 28px;
-    }
-    .badge-status {
-      font-size: 0.85rem;
-      padding: 0.4em 0.75em;
-    }
+    body { background-color: #f8f9fa; }
+    .badge-status { font-size: 0.85rem; padding: 0.4em 0.75em; }
     #traffic-body tr td:first-child {
-      font-family: monospace;
-      white-space: nowrap;
-      font-size: 0.8rem;
+      font-family: monospace; white-space: nowrap; font-size: 0.8rem;
     }
-    .direction-knx {
-      color: #0d6efd;
-      font-weight: 600;
-    }
-    .direction-mqtt {
-      color: #198754;
-      font-weight: 600;
-    }
-    #log-wrapper {
-      max-height: 60vh;
-      overflow-y: auto;
-    }
-    .table-sm td, .table-sm th {
-      vertical-align: middle;
-    }
-    #ga-table td {
-      font-size: 0.9rem;
-    }
-    .empty-msg {
-      color: #6c757d;
-      font-style: italic;
-    }
+    .direction-knx  { color: #0d6efd; font-weight: 600; }
+    .direction-mqtt { color: #198754; font-weight: 600; }
+    #log-wrapper { max-height: 60vh; overflow-y: auto; }
+    .table-sm td, .table-sm th { vertical-align: middle; }
+    #ga-table td { font-size: 0.9rem; }
+    .empty-msg { color: #6c757d; font-style: italic; }
+    tr.unconfigured td { color: #6c757d; }
   </style>
 </head>
 <body>
@@ -57,7 +32,7 @@
   <div class="container-fluid">
     <span class="navbar-brand fw-bold">⚡ piniMqtt4KNX</span>
     <div class="d-flex gap-2 align-items-center">
-      <span id="knx-badge" class="badge bg-secondary badge-status">KNX: …</span>
+      <span id="knx-badge"  class="badge bg-secondary badge-status">KNX: …</span>
       <span id="mqtt-badge" class="badge bg-secondary badge-status">MQTT: …</span>
     </div>
   </div>
@@ -69,7 +44,10 @@
   <div class="row mb-4">
     <div class="col-12 col-xl-5">
       <div class="card shadow-sm h-100">
-        <div class="card-header fw-semibold">Configured Group Addresses</div>
+        <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
+          Configured Group Addresses
+          <button class="btn btn-sm btn-success" id="btn-add-ga">+ Add</button>
+        </div>
         <div class="card-body p-0">
           <div class="table-responsive">
             <table class="table table-sm table-striped mb-0" id="ga-table">
@@ -79,10 +57,11 @@
                   <th>Name</th>
                   <th>DPT</th>
                   <th>Comment</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody id="ga-body">
-                <tr><td colspan="4" class="text-center empty-msg p-3">Loading…</td></tr>
+                <tr><td colspan="5" class="text-center empty-msg p-3">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -145,10 +124,11 @@
               <th>Name / Address</th>
               <th>MQTT Topic</th>
               <th>Value</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="traffic-body">
-            <tr><td colspan="5" class="text-center empty-msg p-3">Waiting for traffic…</td></tr>
+            <tr><td colspan="6" class="text-center empty-msg p-3">Waiting for traffic…</td></tr>
           </tbody>
         </table>
       </div>
@@ -156,6 +136,41 @@
   </div>
 
 </div><!-- /container -->
+
+<!-- Add / Edit Group Address Modal -->
+<div class="modal fade" id="gaModal" tabindex="-1" aria-labelledby="gaModalTitle" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="gaModalTitle">Add Group Address</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="ga-form-error" class="alert alert-danger d-none"></div>
+        <div class="mb-3">
+          <label for="ga-address" class="form-label">Address <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="ga-address" placeholder="e.g. 9/0/1">
+        </div>
+        <div class="mb-3">
+          <label for="ga-name" class="form-label">Name</label>
+          <input type="text" class="form-control" id="ga-name" placeholder="e.g. Living Room Light">
+        </div>
+        <div class="mb-3">
+          <label for="ga-dpt" class="form-label">DPT</label>
+          <input type="text" class="form-control" id="ga-dpt" placeholder="e.g. 1.001">
+        </div>
+        <div class="mb-3">
+          <label for="ga-comment" class="form-label">Comment</label>
+          <input type="text" class="form-control" id="ga-comment" placeholder="Optional note">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-save-ga">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script
   src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
@@ -166,53 +181,155 @@
 <script>
   const socket = io();
 
-  // ── Counters ────────────────────────────────────────────────────────────────
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Counters ─────────────────────────────────────────────────────────────────
   let total = 0, knx2mqtt = 0, mqtt2knx = 0;
 
   function updateCounters(entry) {
     total++;
     if (entry.direction === 'KNX→MQTT') knx2mqtt++;
     if (entry.direction === 'MQTT→KNX') mqtt2knx++;
-    document.getElementById('cnt-total').textContent = total;
+    document.getElementById('cnt-total').textContent    = total;
     document.getElementById('cnt-knx2mqtt').textContent = knx2mqtt;
     document.getElementById('cnt-mqtt2knx').textContent = mqtt2knx;
     document.getElementById('cnt-last-val').textContent = entry.value;
   }
 
-  // ── Traffic rows ────────────────────────────────────────────────────────────
+  // ── Traffic rows ──────────────────────────────────────────────────────────────
   const tbody = document.getElementById('traffic-body');
   let hasRows = false;
 
   function appendRow(entry) {
-    if (!hasRows) {
-      tbody.innerHTML = '';
-      hasRows = true;
-    }
-    const ts = new Date(entry.timestamp).toLocaleTimeString();
+    if (!hasRows) { tbody.innerHTML = ''; hasRows = true; }
+    const ts       = new Date(entry.timestamp).toLocaleTimeString();
     const dirClass = entry.direction === 'KNX→MQTT' ? 'direction-knx' : 'direction-mqtt';
-    const tr = document.createElement('tr');
+    const isConf   = entry.configured !== false;
+    const tr       = document.createElement('tr');
+    if (!isConf) tr.classList.add('unconfigured');
     tr.innerHTML = `
       <td>${escHtml(ts)}</td>
       <td><span class="${dirClass}">${escHtml(entry.direction)}</span></td>
-      <td>${escHtml(entry.name || entry.address)}<br><small class="text-muted">${escHtml(entry.address)}</small></td>
+      <td>
+        ${isConf ? escHtml(entry.name || entry.address) : '<em>' + escHtml(entry.address) + '</em>'}
+        <br><small class="text-muted">${escHtml(entry.address)}</small>
+      </td>
       <td><code>${escHtml(entry.topic)}</code></td>
       <td><strong>${escHtml(String(entry.value))}</strong></td>
+      <td>${!isConf ? '<button class="btn btn-sm btn-outline-primary btn-add-from-traffic" data-address="' + escHtml(entry.address) + '">+ Add</button>' : ''}</td>
     `;
     tbody.prepend(tr);
-    // Keep at most 200 rows
     while (tbody.rows.length > 200) tbody.deleteRow(tbody.rows.length - 1);
   }
 
-  // ── Status badges ───────────────────────────────────────────────────────────
+  // Delegate "Add to config" clicks from the traffic log
+  tbody.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-add-from-traffic');
+    if (btn) openModal(btn.dataset.address);
+  });
+
+  // ── Status badges ─────────────────────────────────────────────────────────────
   function updateBadge(service, connected) {
-    const id = service.toLowerCase() + '-badge';
-    const el = document.getElementById(id);
+    const el = document.getElementById(service.toLowerCase() + '-badge');
     if (!el) return;
     el.textContent = `${service}: ${connected ? 'Connected' : 'Disconnected'}`;
     el.className = `badge badge-status ${connected ? 'bg-success' : 'bg-danger'}`;
   }
 
-  // ── Socket events ───────────────────────────────────────────────────────────
+  // ── Group addresses table ─────────────────────────────────────────────────────
+  let configuredGAs = [];
+
+  function renderGATable(addresses) {
+    configuredGAs = addresses;
+    const gaBody = document.getElementById('ga-body');
+    if (!addresses.length) {
+      gaBody.innerHTML = '<tr><td colspan="5" class="text-center empty-msg p-3">No group addresses configured.</td></tr>';
+      return;
+    }
+    gaBody.innerHTML = addresses.map((ga) => `
+      <tr>
+        <td><code>${escHtml(ga.address)}</code></td>
+        <td>${escHtml(ga.name || '')}</td>
+        <td><small>${escHtml(ga.dpt || '')}</small></td>
+        <td><small class="text-muted">${escHtml(ga.comment || '')}</small></td>
+        <td class="text-end text-nowrap">
+          <button class="btn btn-sm btn-outline-secondary btn-edit-ga me-1" data-address="${escHtml(ga.address)}">Edit</button>
+          <button class="btn btn-sm btn-outline-danger btn-delete-ga"       data-address="${escHtml(ga.address)}">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // Delegate edit / delete clicks in the GA table
+  document.getElementById('ga-body').addEventListener('click', (e) => {
+    const editBtn   = e.target.closest('.btn-edit-ga');
+    const deleteBtn = e.target.closest('.btn-delete-ga');
+    if (editBtn)   openModal(editBtn.dataset.address, true);
+    if (deleteBtn) deleteGA(deleteBtn.dataset.address);
+  });
+
+  function deleteGA(address) {
+    if (!confirm(`Remove group address ${address} from the configuration?`)) return;
+    fetch('/api/groupaddresses/' + encodeURIComponent(address), { method: 'DELETE' })
+      .catch((err) => console.error('Delete GA failed:', err));
+  }
+
+  // ── Add / Edit modal ──────────────────────────────────────────────────────────
+  const gaModal     = new bootstrap.Modal(document.getElementById('gaModal'));
+  const addrInput   = document.getElementById('ga-address');
+  const nameInput   = document.getElementById('ga-name');
+  const dptInput    = document.getElementById('ga-dpt');
+  const commentInput = document.getElementById('ga-comment');
+  const formError   = document.getElementById('ga-form-error');
+
+  function openModal(prefillAddress, editMode) {
+    formError.classList.add('d-none');
+    const ga = editMode ? configuredGAs.find((g) => g.address === prefillAddress) : null;
+    document.getElementById('gaModalTitle').textContent = ga ? 'Edit Group Address' : 'Add Group Address';
+    addrInput.value    = prefillAddress || '';
+    addrInput.readOnly = Boolean(ga);
+    nameInput.value    = ga ? (ga.name    || '') : '';
+    dptInput.value     = ga ? (ga.dpt     || '') : '';
+    commentInput.value = ga ? (ga.comment || '') : '';
+    gaModal.show();
+    if (!addrInput.readOnly) addrInput.focus();
+  }
+
+  document.getElementById('btn-add-ga').addEventListener('click', () => openModal(''));
+
+  document.getElementById('btn-save-ga').addEventListener('click', () => {
+    const address = addrInput.value.trim();
+    if (!address) {
+      formError.textContent = 'Address is required.';
+      formError.classList.remove('d-none');
+      return;
+    }
+    fetch('/api/groupaddresses', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        address,
+        name:    nameInput.value.trim(),
+        dpt:     dptInput.value.trim(),
+        comment: commentInput.value.trim(),
+      }),
+    })
+      .then((r) => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+      .then(() => gaModal.hide())
+      .catch((err) => {
+        formError.textContent = 'Save failed: ' + err.message;
+        formError.classList.remove('d-none');
+      });
+  });
+
+  // ── Socket events ─────────────────────────────────────────────────────────────
   socket.on('init', (log) => {
     log.forEach((entry) => { appendRow(entry); updateCounters(entry); });
   });
@@ -222,52 +339,20 @@
     updateCounters(entry);
   });
 
-  socket.on('status', ({ service, connected }) => {
-    updateBadge(service, connected);
-  });
+  socket.on('status', ({ service, connected }) => updateBadge(service, connected));
 
-  // ── Clear button ────────────────────────────────────────────────────────────
+  socket.on('groupaddresses', renderGATable);
+
+  // ── Clear button ──────────────────────────────────────────────────────────────
   document.getElementById('btn-clear').addEventListener('click', () => {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center empty-msg p-3">Log cleared.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center empty-msg p-3">Log cleared.</td></tr>';
     hasRows = false;
     total = knx2mqtt = mqtt2knx = 0;
-    document.getElementById('cnt-total').textContent = '0';
+    document.getElementById('cnt-total').textContent    = '0';
     document.getElementById('cnt-knx2mqtt').textContent = '0';
     document.getElementById('cnt-mqtt2knx').textContent = '0';
     document.getElementById('cnt-last-val').textContent = '–';
   });
-
-  // ── Group addresses table ───────────────────────────────────────────────────
-  fetch('/api/groupaddresses')
-    .then((r) => r.json())
-    .then((data) => {
-      const gaBody = document.getElementById('ga-body');
-      if (!data.length) {
-        gaBody.innerHTML = '<tr><td colspan="4" class="text-center empty-msg p-3">No group addresses configured.</td></tr>';
-        return;
-      }
-      gaBody.innerHTML = data.map((ga) => `
-        <tr>
-          <td><code>${escHtml(ga.address)}</code></td>
-          <td>${escHtml(ga.name || '')}</td>
-          <td><small>${escHtml(ga.dpt || '')}</small></td>
-          <td><small class="text-muted">${escHtml(ga.comment || '')}</small></td>
-        </tr>
-      `).join('');
-    })
-    .catch(() => {
-      document.getElementById('ga-body').innerHTML =
-        '<tr><td colspan="4" class="text-center text-danger p-3">Failed to load group addresses.</td></tr>';
-    });
-
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-  function escHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
 </script>
 </body>
 </html>

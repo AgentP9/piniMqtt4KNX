@@ -9,7 +9,7 @@ const WebServer = require('./webServer');
 const eventEmitter = new EventEmitter();
 
 // ── Web dashboard ──────────────────────────────────────────────────────────────
-const webServer = new WebServer(config.webPort, eventEmitter, config.groupAddresses); // eslint-disable-line no-unused-vars
+const webServer = new WebServer(config.webPort, eventEmitter, config.groupAddresses, config.groupAddressesPath); // eslint-disable-line no-unused-vars
 
 // ── Connections ────────────────────────────────────────────────────────────────
 const knxHandler = new KnxHandler(config.knx, config.groupAddresses);
@@ -18,7 +18,13 @@ const mqttHandler = new MqttHandler(config.mqtt, config.topicPrefix);
 // ── KNX → MQTT ─────────────────────────────────────────────────────────────────
 knxHandler.on('groupValueWrite', ({ address, src, value, name }) => {
   const topic = `${config.topicPrefix}/${address}`;
-  mqttHandler.publish(topic, value);
+  const ga = config.groupAddresses.find((g) => g.address === address);
+  const configured = Boolean(ga);
+
+  // Only forward to MQTT when the address is in the configuration
+  if (configured) {
+    mqttHandler.publish(topic, value);
+  }
 
   eventEmitter.emit('traffic', {
     direction: 'KNX→MQTT',
@@ -27,6 +33,7 @@ knxHandler.on('groupValueWrite', ({ address, src, value, name }) => {
     topic,
     value: String(value),
     src,
+    configured,
     timestamp: new Date().toISOString(),
   });
 });
@@ -53,6 +60,7 @@ mqttHandler.on('message', ({ topic, value }) => {
     name: ga.name || address,
     topic,
     value,
+    configured: true,
     timestamp: new Date().toISOString(),
   });
 });

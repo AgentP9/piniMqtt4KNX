@@ -11,8 +11,8 @@ RUN npm ci --only=production
 COPY src/ ./src/
 COPY public/ ./public/
 
-# Config directory – intended as a bind-mount volume at runtime
-RUN mkdir -p /app/config
+# Default config – seeded into the named volume on first deployment
+COPY config/ ./config/
 
 EXPOSE 3000
 

@@ -20,5 +20,7 @@ services:
       # Web dashboard
       - WEB_PORT=${WEB_PORT:-3000}
     volumes:
-      # Mount your local config directory so you can edit groupaddresses.json without rebuilding
-      - ./config:/app/config
+      - config:/app/config
+
+volumes:
+  config:

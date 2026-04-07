@@ -27,5 +27,6 @@ module.exports = {
   },
   topicPrefix: process.env.MQTT_TOPIC_PREFIX || 'knx',
   webPort: parseInt(process.env.WEB_PORT, 10) || 3000,
+  groupAddressesPath,
   groupAddresses,
 };
