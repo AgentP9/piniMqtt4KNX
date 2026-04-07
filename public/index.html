@@ -1,17 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#212529" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="piniMqtt4KNX" />
   <title>piniMqtt4KNX – Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/favicon.svg" />
+  <link rel="manifest" href="/manifest.json" />
+  <!-- Restore theme before first paint to avoid flash -->
+  <script>
+    (function () {
+      const t = localStorage.getItem('theme');
+      if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.setAttribute('data-bs-theme', 'dark');
+      }
+    })();
+  </script>
   <link
     rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
     integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
     crossorigin="anonymous"
   />
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    crossorigin="anonymous"
+  />
   <style>
-    body { background-color: #f8f9fa; }
     .badge-status { font-size: 0.85rem; padding: 0.4em 0.75em; }
     #traffic-body tr td:first-child {
       font-family: monospace; white-space: nowrap; font-size: 0.8rem;
@@ -23,9 +44,23 @@
     #ga-table td { font-size: 0.9rem; }
     .empty-msg { color: #6c757d; font-style: italic; }
     tr.unconfigured td { color: #6c757d; }
-    tr.known-ga { background-color: rgba(13, 110, 253, 0.07); }
+    tr.known-ga { background-color: rgba(13, 110, 253, 0.13); }
+    tr.known-ga td:first-child { border-left: 3px solid rgba(13, 110, 253, 0.5); }
+    /* Sort indicators via pseudo-element – prevents column-width shifts */
     th[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; }
-    th[data-sort]:hover { background-color: rgba(255,255,255,0.1); }
+    th[data-sort]::after { content: '\00a0\00a0'; }
+    th[data-sort][data-dir="asc"]::after  { content: ' \2191'; }
+    th[data-sort][data-dir="desc"]::after { content: ' \2193'; }
+    th[data-sort]:hover { background-color: rgba(255,255,255,0.2); }
+    /* Fixed column widths for GA table */
+    #ga-table { table-layout: fixed; }
+    #ga-table col.col-addr    { width: 7rem; }
+    #ga-table col.col-name    { width: 22%; }
+    #ga-table col.col-dpt     { width: 4.5rem; }
+    #ga-table col.col-comment { }
+    #ga-table col.col-lastval { width: 7rem; }
+    #ga-table col.col-actions { width: 5.5rem; }
+    #ga-table td, #ga-table th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -37,6 +72,9 @@
     <div class="d-flex gap-2 align-items-center">
       <span id="knx-badge"  class="badge bg-secondary badge-status">KNX: …</span>
       <span id="mqtt-badge" class="badge bg-secondary badge-status">MQTT: …</span>
+      <button class="btn btn-sm btn-outline-light" id="btn-dark-mode" title="Toggle dark mode" aria-label="Toggle dark mode">
+        <i class="bi bi-moon-fill" id="dark-mode-icon"></i>
+      </button>
     </div>
   </div>
 </nav>
@@ -50,7 +88,7 @@
         <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
           Configured Group Addresses
           <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-secondary" id="btn-import-ga">⬆ Import</button>
+            <button class="btn btn-sm btn-outline-success" id="btn-import-ga">⬆ Import</button>
             <input type="file" id="ga-import-file" accept=".xml" class="d-none">
             <button class="btn btn-sm btn-success" id="btn-add-ga">+ Add</button>
           </div>
@@ -58,12 +96,20 @@
         <div class="card-body p-0">
           <div class="table-responsive">
             <table class="table table-sm table-striped mb-0" id="ga-table">
+              <colgroup>
+                <col class="col-addr">
+                <col class="col-name">
+                <col class="col-dpt">
+                <col class="col-comment">
+                <col class="col-lastval">
+                <col class="col-actions">
+              </colgroup>
               <thead class="table-dark">
                 <tr>
-                  <th data-sort="address" data-label="Address">Address</th>
-                  <th data-sort="name"    data-label="Name">Name</th>
-                  <th data-sort="dpt"     data-label="DPT">DPT</th>
-                  <th data-sort="comment" data-label="Comment">Comment</th>
+                  <th data-sort="address">Address</th>
+                  <th data-sort="name"   >Name</th>
+                  <th data-sort="dpt"    >DPT</th>
+                  <th data-sort="comment">Comment</th>
                   <th>Last Value</th>
                   <th></th>
                 </tr>
@@ -302,8 +348,8 @@
         <td><small class="text-muted">${escHtml(ga.comment || '')}</small></td>
         <td><strong>${escHtml(ga.lastValue !== undefined && ga.lastValue !== null ? formatValue(ga.lastValue, ga.dpt) : '–')}</strong></td>
         <td class="text-end text-nowrap">
-          <button class="btn btn-sm btn-outline-secondary btn-edit-ga me-1" data-address="${escHtml(ga.address)}">Edit</button>
-          <button class="btn btn-sm btn-outline-danger btn-delete-ga"       data-address="${escHtml(ga.address)}">Delete</button>
+          <button class="btn btn-sm btn-outline-secondary btn-edit-ga me-1" data-address="${escHtml(ga.address)}" aria-label="Edit"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-sm btn-outline-danger btn-delete-ga"       data-address="${escHtml(ga.address)}" aria-label="Delete"><i class="bi bi-trash-fill"></i></button>
         </td>
       </tr>
     `).join('');
@@ -312,11 +358,10 @@
   // ── GA table column sorting ───────────────────────────────────────────────────
   function updateSortIndicators() {
     document.querySelectorAll('#ga-table thead th[data-sort]').forEach((th) => {
-      const label = th.dataset.label;
       if (th.dataset.sort === sortCol) {
-        th.textContent = label + (sortDir === 1 ? ' ↑' : ' ↓');
+        th.dataset.dir = sortDir === 1 ? 'asc' : 'desc';
       } else {
-        th.textContent = label;
+        delete th.dataset.dir;
       }
     });
   }
@@ -491,6 +536,33 @@
   socket.on('status', ({ service, connected }) => updateBadge(service, connected));
 
   socket.on('groupaddresses', renderGATable);
+
+  // ── Dark mode toggle ──────────────────────────────────────────────────────────
+  (function initDarkModeButton() {
+    const html     = document.documentElement;
+    const btn      = document.getElementById('btn-dark-mode');
+    const icon     = document.getElementById('dark-mode-icon');
+
+    function applyTheme(theme) {
+      html.setAttribute('data-bs-theme', theme);
+      icon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
+      localStorage.setItem('theme', theme);
+    }
+
+    // Sync icon with the already-applied theme (set by the inline script)
+    applyTheme(html.getAttribute('data-bs-theme') || 'light');
+
+    btn.addEventListener('click', () => {
+      applyTheme(html.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark');
+    });
+  })();
+
+  // ── PWA service worker ────────────────────────────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Service worker registration failed:', err);
+    });
+  }
 
   // ── Clear button ──────────────────────────────────────────────────────────────
   document.getElementById('btn-clear').addEventListener('click', () => {
