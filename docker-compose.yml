@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  piniMqtt4KNX:
+    build: .
+    container_name: piniMqtt4KNX
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    environment:
+      # KNX tunnel
+      - KNX_IP=${KNX_IP:-192.168.1.1}
+      - KNX_PORT=${KNX_PORT:-3671}
+      # MQTT broker
+      - MQTT_HOST=${MQTT_HOST:-localhost}
+      - MQTT_PORT=${MQTT_PORT:-1883}
+      - MQTT_USER=${MQTT_USER:-}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-}
+      - MQTT_TOPIC_PREFIX=${MQTT_TOPIC_PREFIX:-knx}
+      # Web dashboard
+      - WEB_PORT=3000
+    volumes:
+      # Mount your local config directory so you can edit groupaddresses.json without rebuilding
+      - ./config:/app/config

@@ -1,0 +1,26 @@
+[
+  {
+    "address": "9/0/1",
+    "name": "Living Room – Main Light",
+    "dpt": "1.001",
+    "comment": "On/Off switch for the living room main light"
+  },
+  {
+    "address": "9/0/2",
+    "name": "Living Room – Dimmer",
+    "dpt": "5.001",
+    "comment": "Dimmer value 0-255"
+  },
+  {
+    "address": "9/1/0",
+    "name": "Kitchen Temperature",
+    "dpt": "9.001",
+    "comment": "Temperature sensor in °C"
+  },
+  {
+    "address": "0/0/1",
+    "name": "Master Switch",
+    "dpt": "1.001",
+    "comment": "Global on/off toggle"
+  }
+]

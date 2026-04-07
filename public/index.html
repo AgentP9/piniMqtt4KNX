@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>piniMqtt4KNX – Dashboard</title>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+    crossorigin="anonymous"
+  />
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+    .navbar-brand img {
+      height: 28px;
+    }
+    .badge-status {
+      font-size: 0.85rem;
+      padding: 0.4em 0.75em;
+    }
+    #traffic-body tr td:first-child {
+      font-family: monospace;
+      white-space: nowrap;
+      font-size: 0.8rem;
+    }
+    .direction-knx {
+      color: #0d6efd;
+      font-weight: 600;
+    }
+    .direction-mqtt {
+      color: #198754;
+      font-weight: 600;
+    }
+    #log-wrapper {
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    .table-sm td, .table-sm th {
+      vertical-align: middle;
+    }
+    #ga-table td {
+      font-size: 0.9rem;
+    }
+    .empty-msg {
+      color: #6c757d;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-dark bg-dark mb-4">
+  <div class="container-fluid">
+    <span class="navbar-brand fw-bold">⚡ piniMqtt4KNX</span>
+    <div class="d-flex gap-2 align-items-center">
+      <span id="knx-badge" class="badge bg-secondary badge-status">KNX: …</span>
+      <span id="mqtt-badge" class="badge bg-secondary badge-status">MQTT: …</span>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid px-4">
+
+  <!-- Group Addresses card -->
+  <div class="row mb-4">
+    <div class="col-12 col-xl-5">
+      <div class="card shadow-sm h-100">
+        <div class="card-header fw-semibold">Configured Group Addresses</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0" id="ga-table">
+              <thead class="table-dark">
+                <tr>
+                  <th>Address</th>
+                  <th>Name</th>
+                  <th>DPT</th>
+                  <th>Comment</th>
+                </tr>
+              </thead>
+              <tbody id="ga-body">
+                <tr><td colspan="4" class="text-center empty-msg p-3">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="col-12 col-xl-7 mt-3 mt-xl-0">
+      <div class="row g-3 h-100">
+        <div class="col-6">
+          <div class="card shadow-sm text-center py-3">
+            <div class="card-body">
+              <h2 class="display-5 fw-bold text-primary" id="cnt-total">0</h2>
+              <p class="mb-0 text-muted">Total telegrams</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="card shadow-sm text-center py-3">
+            <div class="card-body">
+              <h2 class="display-5 fw-bold text-success" id="cnt-knx2mqtt">0</h2>
+              <p class="mb-0 text-muted">KNX → MQTT</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="card shadow-sm text-center py-3">
+            <div class="card-body">
+              <h2 class="display-5 fw-bold text-info" id="cnt-mqtt2knx">0</h2>
+              <p class="mb-0 text-muted">MQTT → KNX</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="card shadow-sm text-center py-3">
+            <div class="card-body">
+              <h2 class="display-5 fw-bold text-warning" id="cnt-last-val">–</h2>
+              <p class="mb-0 text-muted">Last value</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Traffic Log card -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span class="fw-semibold">Live Traffic Log</span>
+      <button class="btn btn-sm btn-outline-secondary" id="btn-clear">Clear</button>
+    </div>
+    <div class="card-body p-0">
+      <div id="log-wrapper">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-dark sticky-top">
+            <tr>
+              <th>Timestamp</th>
+              <th>Direction</th>
+              <th>Name / Address</th>
+              <th>MQTT Topic</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody id="traffic-body">
+            <tr><td colspan="5" class="text-center empty-msg p-3">Waiting for traffic…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script
+  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+  integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+  crossorigin="anonymous"
+></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+
+  // ── Counters ────────────────────────────────────────────────────────────────
+  let total = 0, knx2mqtt = 0, mqtt2knx = 0;
+
+  function updateCounters(entry) {
+    total++;
+    if (entry.direction === 'KNX→MQTT') knx2mqtt++;
+    if (entry.direction === 'MQTT→KNX') mqtt2knx++;
+    document.getElementById('cnt-total').textContent = total;
+    document.getElementById('cnt-knx2mqtt').textContent = knx2mqtt;
+    document.getElementById('cnt-mqtt2knx').textContent = mqtt2knx;
+    document.getElementById('cnt-last-val').textContent = entry.value;
+  }
+
+  // ── Traffic rows ────────────────────────────────────────────────────────────
+  const tbody = document.getElementById('traffic-body');
+  let hasRows = false;
+
+  function appendRow(entry) {
+    if (!hasRows) {
+      tbody.innerHTML = '';
+      hasRows = true;
+    }
+    const ts = new Date(entry.timestamp).toLocaleTimeString();
+    const dirClass = entry.direction === 'KNX→MQTT' ? 'direction-knx' : 'direction-mqtt';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escHtml(ts)}</td>
+      <td><span class="${dirClass}">${escHtml(entry.direction)}</span></td>
+      <td>${escHtml(entry.name || entry.address)}<br><small class="text-muted">${escHtml(entry.address)}</small></td>
+      <td><code>${escHtml(entry.topic)}</code></td>
+      <td><strong>${escHtml(String(entry.value))}</strong></td>
+    `;
+    tbody.prepend(tr);
+    // Keep at most 200 rows
+    while (tbody.rows.length > 200) tbody.deleteRow(tbody.rows.length - 1);
+  }
+
+  // ── Status badges ───────────────────────────────────────────────────────────
+  function updateBadge(service, connected) {
+    const id = service.toLowerCase() + '-badge';
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = `${service}: ${connected ? 'Connected' : 'Disconnected'}`;
+    el.className = `badge badge-status ${connected ? 'bg-success' : 'bg-danger'}`;
+  }
+
+  // ── Socket events ───────────────────────────────────────────────────────────
+  socket.on('init', (log) => {
+    log.forEach((entry) => { appendRow(entry); updateCounters(entry); });
+  });
+
+  socket.on('traffic', (entry) => {
+    appendRow(entry);
+    updateCounters(entry);
+  });
+
+  socket.on('status', ({ service, connected }) => {
+    updateBadge(service, connected);
+  });
+
+  // ── Clear button ────────────────────────────────────────────────────────────
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center empty-msg p-3">Log cleared.</td></tr>';
+    hasRows = false;
+    total = knx2mqtt = mqtt2knx = 0;
+    document.getElementById('cnt-total').textContent = '0';
+    document.getElementById('cnt-knx2mqtt').textContent = '0';
+    document.getElementById('cnt-mqtt2knx').textContent = '0';
+    document.getElementById('cnt-last-val').textContent = '–';
+  });
+
+  // ── Group addresses table ───────────────────────────────────────────────────
+  fetch('/api/groupaddresses')
+    .then((r) => r.json())
+    .then((data) => {
+      const gaBody = document.getElementById('ga-body');
+      if (!data.length) {
+        gaBody.innerHTML = '<tr><td colspan="4" class="text-center empty-msg p-3">No group addresses configured.</td></tr>';
+        return;
+      }
+      gaBody.innerHTML = data.map((ga) => `
+        <tr>
+          <td><code>${escHtml(ga.address)}</code></td>
+          <td>${escHtml(ga.name || '')}</td>
+          <td><small>${escHtml(ga.dpt || '')}</small></td>
+          <td><small class="text-muted">${escHtml(ga.comment || '')}</small></td>
+        </tr>
+      `).join('');
+    })
+    .catch(() => {
+      document.getElementById('ga-body').innerHTML =
+        '<tr><td colspan="4" class="text-center text-danger p-3">Failed to load group addresses.</td></tr>';
+    });
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>
