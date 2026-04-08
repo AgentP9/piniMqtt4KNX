@@ -58,9 +58,13 @@
     #ga-table col.col-name    { width: 22%; }
     #ga-table col.col-dpt     { width: 4.5rem; }
     #ga-table col.col-comment { }
+    #ga-table col.col-routes  { width: 5rem; }
     #ga-table col.col-lastval { width: 7rem; }
     #ga-table col.col-actions { width: 5.5rem; }
     #ga-table td, #ga-table th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Routes list inside the modal */
+    .route-row { border: 1px solid var(--bs-border-color); border-radius: 0.375rem; padding: 0.5rem; margin-bottom: 0.5rem; position: relative; }
+    .route-row .btn-remove-route { position: absolute; top: 0.25rem; right: 0.25rem; }
   </style>
 </head>
 <body>
@@ -101,6 +105,7 @@
                 <col class="col-name">
                 <col class="col-dpt">
                 <col class="col-comment">
+                <col class="col-routes">
                 <col class="col-lastval">
                 <col class="col-actions">
               </colgroup>
@@ -110,12 +115,13 @@
                   <th data-sort="name"   >Name</th>
                   <th data-sort="dpt"    >DPT</th>
                   <th data-sort="comment">Comment</th>
+                  <th title="Custom MQTT route topics">Routes</th>
                   <th>Last Value</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody id="ga-body">
-                <tr><td colspan="6" class="text-center empty-msg p-3">Loading…</td></tr>
+                <tr><td colspan="7" class="text-center empty-msg p-3">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -193,7 +199,7 @@
 
 <!-- Add / Edit Group Address Modal -->
 <div class="modal fade" id="gaModal" tabindex="-1" aria-labelledby="gaModalTitle" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="gaModalTitle">Add Group Address</h5>
@@ -217,6 +223,16 @@
           <label for="ga-comment" class="form-label">Comment</label>
           <input type="text" class="form-control" id="ga-comment" placeholder="Optional note">
         </div>
+        <!-- Routes section -->
+        <hr>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label class="form-label mb-0 fw-semibold">
+            Custom MQTT Routes
+            <small class="text-muted fw-normal ms-1" title="Forward this group address to/from additional MQTT topics, with optional value mapping">ℹ</small>
+          </label>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-route">+ Add Route</button>
+        </div>
+        <div id="ga-routes-list"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -337,22 +353,29 @@
     const gaBody = document.getElementById('ga-body');
     const sorted = sortedGAs();
     if (!sorted.length) {
-      gaBody.innerHTML = '<tr><td colspan="6" class="text-center empty-msg p-3">No group addresses configured.</td></tr>';
+      gaBody.innerHTML = '<tr><td colspan="7" class="text-center empty-msg p-3">No group addresses configured.</td></tr>';
       return;
     }
-    gaBody.innerHTML = sorted.map((ga) => `
+    gaBody.innerHTML = sorted.map((ga) => {
+      const routeCount = Array.isArray(ga.routes) ? ga.routes.filter((r) => r.mqttTopic).length : 0;
+      const routesBadge = routeCount > 0
+        ? `<span class="badge bg-info text-dark" title="${escHtml(ga.routes.filter((r) => r.mqttTopic).map((r) => r.mqttTopic).join(', '))}">${routeCount} route${routeCount > 1 ? 's' : ''}</span>`
+        : '<span class="text-muted">–</span>';
+      return `
       <tr>
         <td><code>${escHtml(ga.address)}</code></td>
         <td>${escHtml(ga.name || '')}</td>
         <td><small>${escHtml(ga.dpt || '')}</small></td>
         <td><small class="text-muted">${escHtml(ga.comment || '')}</small></td>
+        <td>${routesBadge}</td>
         <td><strong>${escHtml(ga.lastValue !== undefined && ga.lastValue !== null ? formatValue(ga.lastValue, ga.dpt) : '–')}</strong></td>
         <td class="text-end text-nowrap">
           <button class="btn btn-sm btn-outline-secondary btn-edit-ga me-1" data-address="${escHtml(ga.address)}" aria-label="Edit"><i class="bi bi-pencil-fill"></i></button>
           <button class="btn btn-sm btn-outline-danger btn-delete-ga"       data-address="${escHtml(ga.address)}" aria-label="Delete"><i class="bi bi-trash-fill"></i></button>
         </td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
   }
 
   // ── GA table column sorting ───────────────────────────────────────────────────
@@ -386,8 +409,8 @@
         // Update the in-memory GA object so modal edits reflect current DPT
         const ga = configuredGAs.find((g) => g.address === entry.address);
         if (ga) ga.lastValue = entry.value;
-        // Update the cell (column index 4)
-        const cell = row.cells[4];
+        // Update the cell (column index 5 – after the Routes column)
+        const cell = row.cells[5];
         if (cell) cell.innerHTML = `<strong>${escHtml(formatValue(entry.value, entry.dpt))}</strong>`;
         break;
       }
@@ -415,9 +438,50 @@
   const dptInput    = document.getElementById('ga-dpt');
   const commentInput = document.getElementById('ga-comment');
   const formError   = document.getElementById('ga-form-error');
+  const routesList  = document.getElementById('ga-routes-list');
+
+  /** Render one route row in the modal. */
+  function addRouteRow(topic, valueMapStr) {
+    const row = document.createElement('div');
+    row.className = 'route-row';
+    row.innerHTML = `
+      <button type="button" class="btn btn-sm btn-outline-danger btn-remove-route" aria-label="Remove route"><i class="bi bi-x-lg"></i></button>
+      <div class="mb-2">
+        <label class="form-label form-label-sm mb-1">MQTT Topic <span class="text-danger">*</span></label>
+        <input type="text" class="form-control form-control-sm route-topic" placeholder="e.g. Sonos/Living/control" value="${escHtml(topic || '')}">
+      </div>
+      <div>
+        <label class="form-label form-label-sm mb-1">Value Map <small class="text-muted">(JSON, optional – e.g. {"ON":"PLAY","OFF":"STOP"})</small></label>
+        <input type="text" class="form-control form-control-sm route-valuemap" placeholder='{"ON":"PLAY","OFF":"STOP"}' value="${escHtml(valueMapStr || '')}">
+      </div>
+    `;
+    row.querySelector('.btn-remove-route').addEventListener('click', () => row.remove());
+    routesList.appendChild(row);
+  }
+
+  /** Collect route rows from the modal into an array (or undefined if empty). */
+  function collectRoutes() {
+    const rows = routesList.querySelectorAll('.route-row');
+    if (!rows.length) return undefined;
+    const routes = [];
+    for (const row of rows) {
+      const mqttTopic = row.querySelector('.route-topic').value.trim();
+      if (!mqttTopic) continue;
+      const vmRaw = row.querySelector('.route-valuemap').value.trim();
+      let valueMap;
+      if (vmRaw) {
+        try { valueMap = JSON.parse(vmRaw); } catch (_) { valueMap = undefined; }
+      }
+      const route = { mqttTopic };
+      if (valueMap && typeof valueMap === 'object') route.valueMap = valueMap;
+      routes.push(route);
+    }
+    return routes.length ? routes : undefined;
+  }
 
   function openModal(prefillAddress, editMode) {
     formError.classList.add('d-none');
+    routesList.innerHTML = '';
     const ga = editMode ? configuredGAs.find((g) => g.address === prefillAddress) : null;
     document.getElementById('gaModalTitle').textContent = ga ? 'Edit Group Address' : 'Add Group Address';
     addrInput.value    = prefillAddress || '';
@@ -425,9 +489,18 @@
     nameInput.value    = ga ? (ga.name    || '') : '';
     dptInput.value     = ga ? (ga.dpt     || '') : '';
     commentInput.value = ga ? (ga.comment || '') : '';
+    // Populate existing routes
+    if (ga && Array.isArray(ga.routes)) {
+      ga.routes.forEach((r) => {
+        const vmStr = r.valueMap ? JSON.stringify(r.valueMap) : '';
+        addRouteRow(r.mqttTopic || '', vmStr);
+      });
+    }
     gaModal.show();
     if (!addrInput.readOnly) addrInput.focus();
   }
+
+  document.getElementById('btn-add-route').addEventListener('click', () => addRouteRow('', ''));
 
   document.getElementById('btn-add-ga').addEventListener('click', () => openModal(''));
 
@@ -504,15 +577,18 @@
       formError.classList.remove('d-none');
       return;
     }
+    const routes = collectRoutes();
+    const body = {
+      address,
+      name:    nameInput.value.trim(),
+      dpt:     dptInput.value.trim(),
+      comment: commentInput.value.trim(),
+    };
+    if (routes) body.routes = routes;
     fetch('/api/groupaddresses', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        address,
-        name:    nameInput.value.trim(),
-        dpt:     dptInput.value.trim(),
-        comment: commentInput.value.trim(),
-      }),
+      body:    JSON.stringify(body),
     })
       .then((r) => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
       .then(() => gaModal.hide())
