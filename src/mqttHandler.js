@@ -79,6 +79,19 @@ class MqttHandler extends EventEmitter {
   }
 
   /**
+   * Subscribe to an additional MQTT topic beyond the default prefix wildcard.
+   * Safe to call at any time; silently skips when not connected.
+   * @param {string} topic
+   */
+  subscribe(topic) {
+    if (!this.client || !this.connected) return;
+    this.client.subscribe(topic, (err) => {
+      if (err) console.error('[MQTT] Subscribe error:', err.message);
+      else console.log(`[MQTT] Subscribed to ${topic}`);
+    });
+  }
+
+  /**
    * Publish a value to an MQTT topic.
    * @param {string} topic
    * @param {string|number} value

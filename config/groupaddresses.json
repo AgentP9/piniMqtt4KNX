@@ -22,5 +22,20 @@
     "name": "Master Switch",
     "dpt": "1.001",
     "comment": "Global on/off toggle"
+  },
+  {
+    "address": "9/1/1",
+    "name": "Sonos Living Control",
+    "dpt": "1.001",
+    "comment": "Routes KNX button presses to a Sonos player via a custom MQTT topic",
+    "routes": [
+      {
+        "mqttTopic": "Sonos/Living/control",
+        "valueMap": {
+          "ON": "PLAY",
+          "OFF": "STOP"
+        }
+      }
+    ]
   }
 ]

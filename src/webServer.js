@@ -15,6 +15,7 @@ class WebServer {
    */
   constructor(port, eventEmitter, groupAddresses, groupAddressesPath) {
     this.port = port;
+    this.eventEmitter = eventEmitter;
     this.groupAddresses = groupAddresses;
     this.groupAddressesPath = groupAddressesPath;
     this.app = express();
@@ -35,10 +36,19 @@ class WebServer {
 
     // POST – add or update a group address
     this.app.post('/api/groupaddresses', (req, res) => {
-      const { address, name, dpt, comment } = req.body || {};
+      const { address, name, dpt, comment, routes } = req.body || {};
       if (!address) return res.status(400).json({ error: 'address is required' });
 
-      const entry = { address, name: name || '', dpt: dpt || '', comment: comment || '' };
+      const entry = {
+        address,
+        name: name || '',
+        dpt: dpt || '',
+        comment: comment || '',
+        routes: Array.isArray(routes) ? routes : undefined,
+      };
+      // Remove the routes key entirely when not provided so the JSON stays clean
+      if (!entry.routes) delete entry.routes;
+
       const idx = this.groupAddresses.findIndex((g) => g.address === address);
       const previous = idx >= 0 ? this.groupAddresses[idx] : null;
 
@@ -49,6 +59,7 @@ class WebServer {
       }
 
       if (this._saveGroupAddresses()) {
+        this.eventEmitter.emit('ga-saved', entry);
         this.io.emit('groupaddresses', this._enrichGAs());
         return res.json(entry);
       }
@@ -71,9 +82,13 @@ class WebServer {
 
       let added = 0, updated = 0;
       for (const item of addresses) {
-        const { address, name, dpt, comment } = item || {};
+        const { address, name, dpt, comment, routes } = item || {};
         if (!address) continue;
         const entry = { address, name: name || '', dpt: dpt || '', comment: comment || '' };
+        if (Array.isArray(routes)) {
+          if (routes.length > 0) entry.routes = routes;
+          // else: omit routes key so the JSON stays clean (mirrors POST endpoint behaviour)
+        }
         const idx = this.groupAddresses.findIndex((g) => g.address === address);
         if (idx >= 0) {
           // Merge: keep existing values unless the import provides new ones
