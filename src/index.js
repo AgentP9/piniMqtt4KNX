@@ -68,16 +68,22 @@ knxHandler.on('groupValueWrite', ({ address, src, value, name }) => {
 
   // Only forward to MQTT when the address is in the configuration
   if (configured) {
-    mqttHandler.publish(topic, value);
+    const direction = ga.direction || 'both';
+    // Forward to MQTT only when direction allows KNX→MQTT
+    if (direction === 'both' || direction === 'knx2mqtt') {
+      mqttHandler.publish(topic, value);
 
-    // Custom routes: publish to each configured route topic (with optional value mapping)
-    if (Array.isArray(ga.routes)) {
-      for (const route of ga.routes) {
-        if (!route.mqttTopic) continue;
-        const routeValue = applyValueMap(String(value), route.valueMap);
-        mqttHandler.publish(route.mqttTopic, routeValue);
-        console.log(`[BRIDGE] Route KNX→MQTT ${address} → ${route.mqttTopic} = ${routeValue}`);
+      // Custom routes: publish to each configured route topic (with optional value mapping)
+      if (Array.isArray(ga.routes)) {
+        for (const route of ga.routes) {
+          if (!route.mqttTopic) continue;
+          const routeValue = applyValueMap(String(value), route.valueMap);
+          mqttHandler.publish(route.mqttTopic, routeValue);
+          console.log(`[BRIDGE] Route KNX→MQTT ${address} → ${route.mqttTopic} = ${routeValue}`);
+        }
       }
+    } else {
+      console.log(`[BRIDGE] KNX→MQTT blocked for ${address} (direction=${direction})`);
     }
   }
 
@@ -110,18 +116,23 @@ mqttHandler.on('message', ({ topic, value }) => {
       return;
     }
 
-    knxHandler.write(address, value);
+    const gaDirection = ga.direction || 'both';
+    if (gaDirection === 'both' || gaDirection === 'mqtt2knx') {
+      knxHandler.write(address, value);
 
-    eventEmitter.emit('traffic', {
-      direction: 'MQTT→KNX',
-      address,
-      name: ga.name || address,
-      topic,
-      value,
-      dpt: ga.dpt,
-      configured: true,
-      timestamp: new Date().toISOString(),
-    });
+      eventEmitter.emit('traffic', {
+        direction: 'MQTT→KNX',
+        address,
+        name: ga.name || address,
+        topic,
+        value,
+        dpt: ga.dpt,
+        configured: true,
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      console.log(`[BRIDGE] MQTT→KNX blocked for ${address} (direction=${gaDirection})`);
+    }
     return;
   }
 
@@ -131,21 +142,26 @@ mqttHandler.on('message', ({ topic, value }) => {
     for (const route of ga.routes) {
       if (route.mqttTopic !== topic) continue;
 
-      // Reverse-map MQTT payload → KNX value string
-      const knxValue = applyReverseValueMap(value, route.valueMap);
-      console.log(`[BRIDGE] Route MQTT→KNX ${topic} → ${ga.address} = ${knxValue}`);
-      knxHandler.write(ga.address, knxValue);
+      const gaDirection = ga.direction || 'both';
+      if (gaDirection === 'both' || gaDirection === 'mqtt2knx') {
+        // Reverse-map MQTT payload → KNX value string
+        const knxValue = applyReverseValueMap(value, route.valueMap);
+        console.log(`[BRIDGE] Route MQTT→KNX ${topic} → ${ga.address} = ${knxValue}`);
+        knxHandler.write(ga.address, knxValue);
 
-      eventEmitter.emit('traffic', {
-        direction: 'MQTT→KNX',
-        address: ga.address,
-        name: ga.name || ga.address,
-        topic,
-        value,
-        dpt: ga.dpt,
-        configured: true,
-        timestamp: new Date().toISOString(),
-      });
+        eventEmitter.emit('traffic', {
+          direction: 'MQTT→KNX',
+          address: ga.address,
+          name: ga.name || ga.address,
+          topic,
+          value,
+          dpt: ga.dpt,
+          configured: true,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        console.log(`[BRIDGE] Route MQTT→KNX blocked for ${ga.address} (direction=${gaDirection})`);
+      }
       return;
     }
   }

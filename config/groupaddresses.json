@@ -15,13 +15,15 @@
     "address": "9/1/0",
     "name": "Kitchen Temperature",
     "dpt": "9.001",
-    "comment": "Temperature sensor in °C"
+    "comment": "Temperature sensor in °C – read-only sensor, forward to MQTT only",
+    "direction": "knx2mqtt"
   },
   {
     "address": "0/0/1",
     "name": "Master Switch",
     "dpt": "1.001",
-    "comment": "Global on/off toggle"
+    "comment": "Global on/off toggle – controlled from MQTT only",
+    "direction": "mqtt2knx"
   },
   {
     "address": "9/1/1",
