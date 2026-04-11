@@ -58,6 +58,7 @@
     #ga-table col.col-name    { width: 22%; }
     #ga-table col.col-dpt     { width: 4.5rem; }
     #ga-table col.col-comment { }
+    #ga-table col.col-dir     { width: 3rem; }
     #ga-table col.col-routes  { width: 5rem; }
     #ga-table col.col-lastval { width: 7rem; }
     #ga-table col.col-actions { width: 5.5rem; }
@@ -105,6 +106,7 @@
                 <col class="col-name">
                 <col class="col-dpt">
                 <col class="col-comment">
+                <col class="col-dir">
                 <col class="col-routes">
                 <col class="col-lastval">
                 <col class="col-actions">
@@ -115,13 +117,14 @@
                   <th data-sort="name"   >Name</th>
                   <th data-sort="dpt"    >DPT</th>
                   <th data-sort="comment">Comment</th>
+                  <th title="Routing direction">Dir</th>
                   <th title="Custom MQTT route topics">Routes</th>
                   <th>Last Value</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody id="ga-body">
-                <tr><td colspan="7" class="text-center empty-msg p-3">Loading…</td></tr>
+                <tr><td colspan="8" class="text-center empty-msg p-3">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -222,6 +225,14 @@
         <div class="mb-3">
           <label for="ga-comment" class="form-label">Comment</label>
           <input type="text" class="form-control" id="ga-comment" placeholder="Optional note">
+        </div>
+        <div class="mb-3">
+          <label for="ga-direction" class="form-label">Direction</label>
+          <select class="form-select" id="ga-direction">
+            <option value="both">Bidirectional KNX ↔ MQTT (default)</option>
+            <option value="knx2mqtt">KNX → MQTT only</option>
+            <option value="mqtt2knx">MQTT → KNX only</option>
+          </select>
         </div>
         <!-- Routes section -->
         <hr>
@@ -353,7 +364,7 @@
     const gaBody = document.getElementById('ga-body');
     const sorted = sortedGAs();
     if (!sorted.length) {
-      gaBody.innerHTML = '<tr><td colspan="7" class="text-center empty-msg p-3">No group addresses configured.</td></tr>';
+      gaBody.innerHTML = '<tr><td colspan="8" class="text-center empty-msg p-3">No group addresses configured.</td></tr>';
       return;
     }
     gaBody.innerHTML = sorted.map((ga) => {
@@ -361,12 +372,17 @@
       const routesBadge = routeCount > 0
         ? `<span class="badge bg-info text-dark" title="${escHtml(ga.routes.filter((r) => r.mqttTopic).map((r) => r.mqttTopic).join(', '))}">${routeCount} route${routeCount > 1 ? 's' : ''}</span>`
         : '<span class="text-muted">–</span>';
+      const dir = ga.direction || 'both';
+      const dirIcon = dir === 'knx2mqtt' ? '<i class="bi bi-arrow-right" title="KNX → MQTT only"></i>'
+                    : dir === 'mqtt2knx' ? '<i class="bi bi-arrow-left"  title="MQTT → KNX only"></i>'
+                    :                      '<i class="bi bi-arrow-left-right text-muted" title="Bidirectional"></i>';
       return `
       <tr>
         <td><code>${escHtml(ga.address)}</code></td>
         <td>${escHtml(ga.name || '')}</td>
         <td><small>${escHtml(ga.dpt || '')}</small></td>
         <td><small class="text-muted">${escHtml(ga.comment || '')}</small></td>
+        <td class="text-center">${dirIcon}</td>
         <td>${routesBadge}</td>
         <td><strong>${escHtml(ga.lastValue !== undefined && ga.lastValue !== null ? formatValue(ga.lastValue, ga.dpt) : '–')}</strong></td>
         <td class="text-end text-nowrap">
@@ -409,8 +425,8 @@
         // Update the in-memory GA object so modal edits reflect current DPT
         const ga = configuredGAs.find((g) => g.address === entry.address);
         if (ga) ga.lastValue = entry.value;
-        // Update the cell (column index 5 – after the Routes column)
-        const cell = row.cells[5];
+        // Update the cell (column index 6 – after the Direction and Routes columns)
+        const cell = row.cells[6];
         if (cell) cell.innerHTML = `<strong>${escHtml(formatValue(entry.value, entry.dpt))}</strong>`;
         break;
       }
@@ -437,6 +453,7 @@
   const nameInput   = document.getElementById('ga-name');
   const dptInput    = document.getElementById('ga-dpt');
   const commentInput = document.getElementById('ga-comment');
+  const dirSelect   = document.getElementById('ga-direction');
   const formError   = document.getElementById('ga-form-error');
   const routesList  = document.getElementById('ga-routes-list');
 
@@ -489,6 +506,7 @@
     nameInput.value    = ga ? (ga.name    || '') : '';
     dptInput.value     = ga ? (ga.dpt     || '') : '';
     commentInput.value = ga ? (ga.comment || '') : '';
+    dirSelect.value    = ga ? (ga.direction || 'both') : 'both';
     // Populate existing routes
     if (ga && Array.isArray(ga.routes)) {
       ga.routes.forEach((r) => {
@@ -580,9 +598,10 @@
     const routes = collectRoutes();
     const body = {
       address,
-      name:    nameInput.value.trim(),
-      dpt:     dptInput.value.trim(),
-      comment: commentInput.value.trim(),
+      name:      nameInput.value.trim(),
+      dpt:       dptInput.value.trim(),
+      comment:   commentInput.value.trim(),
+      direction: dirSelect.value || 'both',
     };
     if (routes) body.routes = routes;
     fetch('/api/groupaddresses', {
