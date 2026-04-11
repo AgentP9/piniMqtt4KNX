@@ -9,6 +9,7 @@ A Docker-based **KNX ↔ MQTT gateway** with a live web traffic dashboard.
 - Group-address mapping defined in a **JSON file** mounted as a Docker volume (no rebuild required)
 - **KNX → MQTT**: every `GroupValue_Write` on the KNX bus is published to `<prefix>/<address>` (e.g. `knx/9/0/1`)
 - **MQTT → KNX**: messages received on `<prefix>/<address>` are written back to the corresponding KNX group address
+- **Per-address routing direction**: configure each group address as bidirectional (default), KNX→MQTT only, or MQTT→KNX only
 - **Web dashboard** (port 3000) showing live telegram traffic, connection status and the configured group addresses
 
 ---
@@ -41,20 +42,42 @@ Edit `config/groupaddresses.json` (mounted as a volume – no Docker rebuild nee
     "address": "9/1/0",
     "name": "Kitchen Temperature",
     "dpt": "9.001",
-    "comment": "Temperature sensor in °C"
+    "comment": "Read-only sensor – KNX → MQTT only",
+    "direction": "knx2mqtt"
+  },
+  {
+    "address": "0/0/1",
+    "name": "Master Switch",
+    "dpt": "1.001",
+    "comment": "Controlled from automation – MQTT → KNX only",
+    "direction": "mqtt2knx"
   }
 ]
 ```
 
-| Field     | Required | Description                              |
-|-----------|----------|------------------------------------------|
-| `address` | ✅       | KNX group address (e.g. `"9/0/1"`)      |
-| `name`    | –        | Human-readable label shown in dashboard  |
-| `dpt`     | –        | Data Point Type for encoding/decoding    |
-| `comment` | –        | Free-text note                           |
+| Field       | Required | Description                                             |
+|-------------|----------|---------------------------------------------------------|
+| `address`   | ✅       | KNX group address (e.g. `"9/0/1"`)                     |
+| `name`      | –        | Human-readable label shown in dashboard                 |
+| `dpt`       | –        | Data Point Type for encoding/decoding                   |
+| `comment`   | –        | Free-text note                                          |
+| `direction` | –        | Routing direction – see table below (default: `"both"`) |
 
 Supported DPT groups: `1.x` (boolean), `5.x` (unsigned byte), `9.x` (2-byte float).  
 Any other DPT falls back to a hex-string representation.
+
+### Routing direction
+
+Each group address can have an optional `direction` field that restricts which side of the bridge is active:
+
+| Value        | Behaviour                                               |
+|--------------|---------------------------------------------------------|
+| *(omitted)*  | Bidirectional KNX ↔ MQTT (default)                     |
+| `"both"`     | Bidirectional KNX ↔ MQTT (explicit, same as omitted)   |
+| `"knx2mqtt"` | KNX → MQTT only (e.g. read-only sensors)               |
+| `"mqtt2knx"` | MQTT → KNX only (e.g. actuators driven by automation)  |
+
+> When `"both"` is the effective direction the key is omitted from the saved JSON to keep the config clean.
 
 ### 3. Run
 
@@ -94,7 +117,8 @@ Example: KNX group address `9/0/1` with default prefix → topic `knx/9/0/1`.
 **MQTT → KNX**: publish any value string to `knx/9/0/1`; it is encoded via the configured DPT before being written to KNX.
 
 > ⚠️ Only group addresses listed in `groupaddresses.json` are forwarded from MQTT → KNX (acts as an allowlist).  
-> All incoming KNX bus telegrams are forwarded KNX → MQTT regardless of the configuration file.
+> All incoming KNX bus telegrams are forwarded KNX → MQTT regardless of the configuration file, unless the address has `"direction": "mqtt2knx"`.  
+> Similarly, MQTT messages to a group address with `"direction": "knx2mqtt"` are silently ignored.
 
 ---
 
