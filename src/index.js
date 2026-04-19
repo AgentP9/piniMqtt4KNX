@@ -15,6 +15,83 @@ const webServer = new WebServer(config.webPort, eventEmitter, config.groupAddres
 const knxHandler = new KnxHandler(config.knx, config.groupAddresses);
 const mqttHandler = new MqttHandler(config.mqtt, config.topicPrefix);
 
+// ── Repeat-publish timers ──────────────────────────────────────────────────────
+
+/** Minimum allowed repeat interval in milliseconds. */
+const MIN_REPEAT_INTERVAL_MS = 1000;
+
+/**
+ * Active repeat timers for GA-level publishing.
+ * key: group address string  →  value: { timer, topic, value }
+ */
+const repeatTimers = new Map();
+
+/**
+ * Active repeat timers for route-level publishing.
+ * key: `${gaAddress}::${route.mqttTopic}`  →  timer handle
+ */
+const routeRepeatTimers = new Map();
+
+/**
+ * Start (or restart) a GA-level repeat timer.
+ * The timer self-cancels if the GA no longer has a repeatInterval.
+ */
+function startRepeatTimer(address, topic, value, intervalSec) {
+  stopRepeatTimer(address);
+  const ms = Math.max(MIN_REPEAT_INTERVAL_MS, intervalSec * 1000);
+  const timer = setInterval(() => {
+    const ga = config.groupAddresses.find((g) => g.address === address);
+    if (!ga || !(Number(ga.repeatInterval) > 0)) {
+      clearInterval(timer);
+      repeatTimers.delete(address);
+      return;
+    }
+    mqttHandler.publish(topic, value);
+    console.log(`[BRIDGE] Repeat KNX→MQTT ${address} → ${topic} = ${value}`);
+  }, ms);
+  repeatTimers.set(address, { timer, topic, value });
+}
+
+function stopRepeatTimer(address) {
+  const existing = repeatTimers.get(address);
+  if (existing) {
+    clearInterval(existing.timer);
+    repeatTimers.delete(address);
+  }
+}
+
+/**
+ * Start (or restart) a route-level repeat timer.
+ * The timer self-cancels if the route no longer has a repeatInterval.
+ */
+function startRouteRepeatTimer(gaAddress, route, value, intervalSec) {
+  const key = `${gaAddress}::${route.mqttTopic}`;
+  stopRouteRepeatTimer(key);
+  const ms = Math.max(MIN_REPEAT_INTERVAL_MS, intervalSec * 1000);
+  const timer = setInterval(() => {
+    const ga = config.groupAddresses.find((g) => g.address === gaAddress);
+    const currentRoute = ga && Array.isArray(ga.routes)
+      ? ga.routes.find((r) => r.mqttTopic === route.mqttTopic)
+      : null;
+    if (!currentRoute || !(Number(currentRoute.repeatInterval) > 0)) {
+      clearInterval(timer);
+      routeRepeatTimers.delete(key);
+      return;
+    }
+    mqttHandler.publish(route.mqttTopic, value);
+    console.log(`[BRIDGE] Repeat route KNX→MQTT ${gaAddress} → ${route.mqttTopic} = ${value}`);
+  }, ms);
+  routeRepeatTimers.set(key, timer);
+}
+
+function stopRouteRepeatTimer(key) {
+  const existing = routeRepeatTimers.get(key);
+  if (existing) {
+    clearInterval(existing);
+    routeRepeatTimers.delete(key);
+  }
+}
+
 // ── Router helpers ─────────────────────────────────────────────────────────────
 
 /**
@@ -73,6 +150,14 @@ knxHandler.on('groupValueWrite', ({ address, src, value, name }) => {
     if (direction === 'both' || direction === 'knx2mqtt') {
       mqttHandler.publish(topic, value);
 
+      // GA-level repeat timer
+      const gaInterval = Number(ga.repeatInterval);
+      if (gaInterval > 0) {
+        startRepeatTimer(address, topic, String(value), gaInterval);
+      } else {
+        stopRepeatTimer(address);
+      }
+
       // Custom routes: publish to each configured route topic (with optional value mapping)
       if (Array.isArray(ga.routes)) {
         for (const route of ga.routes) {
@@ -80,6 +165,14 @@ knxHandler.on('groupValueWrite', ({ address, src, value, name }) => {
           const routeValue = applyValueMap(String(value), route.valueMap);
           mqttHandler.publish(route.mqttTopic, routeValue);
           console.log(`[BRIDGE] Route KNX→MQTT ${address} → ${route.mqttTopic} = ${routeValue}`);
+
+          // Route-level repeat timer
+          const routeInterval = Number(route.repeatInterval);
+          if (routeInterval > 0) {
+            startRouteRepeatTimer(address, route, routeValue, routeInterval);
+          } else {
+            stopRouteRepeatTimer(`${address}::${route.mqttTopic}`);
+          }
         }
       }
     } else {

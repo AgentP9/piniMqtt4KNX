@@ -10,6 +10,7 @@ A Docker-based **KNX ↔ MQTT gateway** with a live web traffic dashboard.
 - **KNX → MQTT**: every `GroupValue_Write` on the KNX bus is published to `<prefix>/<address>` (e.g. `knx/9/0/1`)
 - **MQTT → KNX**: messages received on `<prefix>/<address>` are written back to the corresponding KNX group address
 - **Per-address routing direction**: configure each group address as bidirectional (default), KNX→MQTT only, or MQTT→KNX only
+- **Repeat publishing**: optionally re-publish the last KNX value to MQTT at a fixed interval until a new KNX message arrives
 - **Web dashboard** (port 3000) showing live telegram traffic, connection status and the configured group addresses
 
 ---
@@ -51,17 +52,26 @@ Edit `config/groupaddresses.json` (mounted as a volume – no Docker rebuild nee
     "dpt": "1.001",
     "comment": "Controlled from automation – MQTT → KNX only",
     "direction": "mqtt2knx"
+  },
+  {
+    "address": "9/2/0",
+    "name": "Outdoor Temperature",
+    "dpt": "9.001",
+    "comment": "Repeat every 30 s so consumers see a fresh value even without bus activity",
+    "direction": "knx2mqtt",
+    "repeatInterval": 30
   }
 ]
 ```
 
-| Field       | Required | Description                                             |
-|-------------|----------|---------------------------------------------------------|
-| `address`   | ✅       | KNX group address (e.g. `"9/0/1"`)                     |
-| `name`      | –        | Human-readable label shown in dashboard                 |
-| `dpt`       | –        | Data Point Type for encoding/decoding                   |
-| `comment`   | –        | Free-text note                                          |
-| `direction` | –        | Routing direction – see table below (default: `"both"`) |
+| Field             | Required | Description                                             |
+|-------------------|----------|---------------------------------------------------------|
+| `address`         | ✅       | KNX group address (e.g. `"9/0/1"`)                     |
+| `name`            | –        | Human-readable label shown in dashboard                 |
+| `dpt`             | –        | Data Point Type for encoding/decoding                   |
+| `comment`         | –        | Free-text note                                          |
+| `direction`       | –        | Routing direction – see table below (default: `"both"`) |
+| `repeatInterval`  | –        | Re-publish interval in **seconds** (e.g. `5`); `0` or omitted disables repeat |
 
 Supported DPT groups: `1.x` (boolean), `5.x` (unsigned byte), `9.x` (2-byte float).  
 Any other DPT falls back to a hex-string representation.
@@ -78,6 +88,21 @@ Each group address can have an optional `direction` field that restricts which s
 | `"mqtt2knx"` | MQTT → KNX only (e.g. actuators driven by automation)  |
 
 > When `"both"` is the effective direction the key is omitted from the saved JSON to keep the config clean.
+
+### Repeat publishing
+
+When `repeatInterval` is set on a group address (or on an individual custom route), the bridge re-publishes the **last received KNX value** to MQTT at that fixed interval.
+
+| Value            | Behaviour                                         |
+|------------------|---------------------------------------------------|
+| *(omitted or 0)* | No repeat – value is published once per telegram  |
+| `5`              | Re-publish every 5 seconds                        |
+| `60`             | Re-publish every 60 seconds (1 minute)            |
+
+The repeat timer **resets** every time a new KNX telegram arrives for that group address, so the published value is always the most-recent one.  
+The timer **stops automatically** if `repeatInterval` is removed from the configuration (the change takes effect on the next timer tick).
+
+`repeatInterval` can also be set individually on each custom route entry, allowing different repeat rates per MQTT topic.
 
 ### 3. Run
 
