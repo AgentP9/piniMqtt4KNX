@@ -127,7 +127,7 @@ class MqttHandler extends EventEmitter {
       return;
     }
     this._manualReconnectRequested = true;
-    this.client.end(true);
+    this.client.end(false);
   }
 }
 
