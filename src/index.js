@@ -33,6 +33,19 @@ const repeatTimers = new Map();
 const routeRepeatTimers = new Map();
 
 /**
+ * Publish a repeat tick: the plain value to `topic` and the current Unix
+ * timestamp (seconds) to `topic/ts`.  The companion timestamp topic always
+ * carries a changing value so that automation platforms which implement
+ * application-level change-detection (e.g. Home Assistant's state_changed
+ * event) are still triggered on every tick even when the main value is
+ * unchanged.
+ */
+function publishRepeatTick(topic, value) {
+  mqttHandler.publish(topic, value);
+  mqttHandler.publish(`${topic}/ts`, String(Math.floor(Date.now() / 1000)));
+}
+
+/**
  * Start (or restart) a GA-level repeat timer.
  * The timer self-cancels if the GA no longer has a repeatInterval.
  */
@@ -46,7 +59,7 @@ function startRepeatTimer(address, topic, value, intervalSec) {
       repeatTimers.delete(address);
       return;
     }
-    mqttHandler.publish(topic, value);
+    publishRepeatTick(topic, value);
     console.log(`[BRIDGE] Repeat KNX→MQTT ${address} → ${topic} = ${value}`);
   }, ms);
   repeatTimers.set(address, { timer, topic, value });
@@ -78,7 +91,7 @@ function startRouteRepeatTimer(gaAddress, route, value, intervalSec) {
       routeRepeatTimers.delete(key);
       return;
     }
-    mqttHandler.publish(route.mqttTopic, value);
+    publishRepeatTick(route.mqttTopic, value);
     console.log(`[BRIDGE] Repeat route KNX→MQTT ${gaAddress} → ${route.mqttTopic} = ${value}`);
   }, ms);
   routeRepeatTimers.set(key, timer);

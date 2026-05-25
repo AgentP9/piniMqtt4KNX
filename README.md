@@ -102,6 +102,22 @@ When `repeatInterval` is set on a group address (or on an individual custom rout
 The repeat timer **resets** every time a new KNX telegram arrives for that group address, so the published value is always the most-recent one.  
 The timer **stops automatically** if `repeatInterval` is removed from the configuration (the change takes effect on the next timer tick).
 
+#### Companion timestamp topic
+
+Some automation platforms implement application-level change-detection and only act when the payload on a topic **actually changes**. Because the KNX value itself may be constant (e.g. a temperature sensor sitting at 21.5 °C), simply republishing `21.5` would be silently ignored by those platforms.
+
+To guarantee a trigger on every tick, the bridge additionally publishes the current **Unix timestamp in seconds** to a companion topic:
+
+```
+<topic>/ts       ← always-changing timestamp (e.g. "1716649786")
+```
+
+Example for GA `9/1/0`:
+- `knx/9/1/0`    → `"21.50"` (value – may be the same each tick)
+- `knx/9/1/0/ts` → `"1716649786"` (always different – use this as trigger)
+
+An automation rule that must act on every repeat tick should **subscribe to `…/ts`** and read the value from the primary topic.
+
 `repeatInterval` can also be set individually on each custom route entry, allowing different repeat rates per MQTT topic.
 
 ### 3. Run
