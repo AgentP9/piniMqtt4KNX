@@ -293,3 +293,6 @@ mqttHandler.on('disconnected', () =>
 eventEmitter.on('ga-saved', () => {
   if (mqttHandler.connected) subscribeRouteTopics();
 });
+
+// Allow dashboard-triggered MQTT restart (refreshes connection + subscriptions)
+eventEmitter.on('mqtt-restart', () => mqttHandler.restart());

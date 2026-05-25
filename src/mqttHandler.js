@@ -17,6 +17,7 @@ class MqttHandler extends EventEmitter {
     this.topicPrefix = topicPrefix;
     this.client = null;
     this.connected = false;
+    this._manualReconnectRequested = false;
     this._reconnectDelay = RECONNECT_MIN_DELAY;
     this._reconnectTimer = null;
     this._connect();
@@ -63,6 +64,11 @@ class MqttHandler extends EventEmitter {
       if (wasConnected) {
         this.emit('disconnected');
       }
+      if (this._manualReconnectRequested) {
+        this._manualReconnectRequested = false;
+        this._connect();
+        return;
+      }
       this._scheduleReconnect();
     });
   }
@@ -104,6 +110,24 @@ class MqttHandler extends EventEmitter {
     const payload = typeof value === 'object' ? JSON.stringify(value) : String(value);
     this.client.publish(topic, payload, { retain: false });
     console.log(`[MQTT] Publish ${topic} = ${payload}`);
+  }
+
+  /**
+   * Restart the MQTT connection and refresh subscriptions.
+   */
+  restart() {
+    console.log('[MQTT] Restart requested');
+    this._reconnectDelay = RECONNECT_MIN_DELAY;
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+    if (!this.client) {
+      this._connect();
+      return;
+    }
+    this._manualReconnectRequested = true;
+    this.client.end(true);
   }
 }
 

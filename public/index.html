@@ -78,6 +78,9 @@
     <div class="d-flex gap-2 align-items-center">
       <span id="knx-badge"  class="badge bg-secondary badge-status">KNX: …</span>
       <span id="mqtt-badge" class="badge bg-secondary badge-status">MQTT: …</span>
+      <button class="btn btn-sm btn-outline-light" id="btn-restart-mqtt" title="Restart MQTT connection" aria-label="Restart MQTT connection">
+        <i class="bi bi-arrow-repeat"></i>
+      </button>
       <button class="btn btn-sm btn-outline-light" id="btn-dark-mode" title="Toggle dark mode" aria-label="Toggle dark mode">
         <i class="bi bi-moon-fill" id="dark-mode-icon"></i>
       </button>
@@ -660,6 +663,10 @@
   socket.on('status', ({ service, connected }) => updateBadge(service, connected));
 
   socket.on('groupaddresses', renderGATable);
+
+  document.getElementById('btn-restart-mqtt').addEventListener('click', () => {
+    socket.emit('mqtt-restart');
+  });
 
   // ── Dark mode toggle ──────────────────────────────────────────────────────────
   (function initDarkModeButton() {

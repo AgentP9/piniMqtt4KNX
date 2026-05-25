@@ -151,6 +151,7 @@ class WebServer {
         socket.emit('status', { service, connected });
       });
       socket.emit('groupaddresses', this._enrichGAs());
+      socket.on('mqtt-restart', () => this.eventEmitter.emit('mqtt-restart'));
       socket.on('disconnect', () => console.log('[WEB] Client disconnected'));
     });
 
