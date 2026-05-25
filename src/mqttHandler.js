@@ -122,6 +122,7 @@ class MqttHandler extends EventEmitter {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
     }
+    if (this._manualReconnectRequested) return;
     if (!this.client) {
       this._connect();
       return;
