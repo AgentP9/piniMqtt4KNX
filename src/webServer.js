@@ -36,7 +36,7 @@ class WebServer {
 
     // POST – add or update a group address
     this.app.post('/api/groupaddresses', (req, res) => {
-      const { address, name, dpt, comment, routes, direction } = req.body || {};
+      const { address, name, dpt, comment, routes, direction, repeatInterval } = req.body || {};
       if (!address) return res.status(400).json({ error: 'address is required' });
 
       const entry = {
@@ -50,6 +50,9 @@ class WebServer {
       if (!entry.routes) delete entry.routes;
       // Store direction only when it differs from the default ('both')
       if (direction && direction !== 'both') entry.direction = direction;
+      // Store repeatInterval only when it is a positive number
+      const ri = Number(repeatInterval);
+      if (ri > 0) entry.repeatInterval = ri;
 
       const idx = this.groupAddresses.findIndex((g) => g.address === address);
       const previous = idx >= 0 ? this.groupAddresses[idx] : null;
@@ -84,7 +87,7 @@ class WebServer {
 
       let added = 0, updated = 0;
       for (const item of addresses) {
-        const { address, name, dpt, comment, routes, direction } = item || {};
+        const { address, name, dpt, comment, routes, direction, repeatInterval } = item || {};
         if (!address) continue;
         const entry = { address, name: name || '', dpt: dpt || '', comment: comment || '' };
         if (Array.isArray(routes)) {
@@ -93,6 +96,9 @@ class WebServer {
         }
         // Store direction only when it differs from the default ('both')
         if (direction && direction !== 'both') entry.direction = direction;
+        // Store repeatInterval only when it is a positive number
+        const ri = Number(repeatInterval);
+        if (ri > 0) entry.repeatInterval = ri;
         const idx = this.groupAddresses.findIndex((g) => g.address === address);
         if (idx >= 0) {
           // Merge: keep existing values unless the import provides new ones

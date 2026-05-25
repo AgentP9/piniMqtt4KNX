@@ -66,6 +66,7 @@
     /* Routes list inside the modal */
     .route-row { border: 1px solid var(--bs-border-color); border-radius: 0.375rem; padding: 0.5rem; margin-bottom: 0.5rem; position: relative; }
     .route-row .btn-remove-route { position: absolute; top: 0.25rem; right: 0.25rem; }
+    .repeat-icon { font-size: 0.75rem; }
   </style>
 </head>
 <body>
@@ -234,6 +235,16 @@
             <option value="mqtt2knx">MQTT → KNX only</option>
           </select>
         </div>
+        <div class="mb-3">
+          <label for="ga-repeat-interval" class="form-label">
+            Repeat Interval
+            <small class="text-muted fw-normal ms-1" title="Re-publish the last KNX value to MQTT at this interval (seconds) until a new KNX message arrives. Leave blank or 0 to disable.">ℹ</small>
+          </label>
+          <div class="input-group">
+            <input type="number" class="form-control" id="ga-repeat-interval" placeholder="e.g. 5" min="0" step="1">
+            <span class="input-group-text">seconds</span>
+          </div>
+        </div>
         <!-- Routes section -->
         <hr>
         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -372,6 +383,9 @@
       const routesBadge = routeCount > 0
         ? `<span class="badge bg-info text-dark" title="${escHtml(ga.routes.filter((r) => r.mqttTopic).map((r) => r.mqttTopic).join(', '))}">${routeCount} route${routeCount > 1 ? 's' : ''}</span>`
         : '<span class="text-muted">–</span>';
+      const repeatBadge = ga.repeatInterval > 0
+        ? `<span class="badge bg-warning text-dark repeat-icon ms-1" title="Repeat every ${escHtml(String(ga.repeatInterval))}s">↻${escHtml(String(ga.repeatInterval))}s</span>`
+        : '';
       const dir = ga.direction || 'both';
       const dirIcon = dir === 'knx2mqtt' ? '<i class="bi bi-arrow-right" title="KNX → MQTT only"></i>'
                     : dir === 'mqtt2knx' ? '<i class="bi bi-arrow-left"  title="MQTT → KNX only"></i>'
@@ -383,7 +397,7 @@
         <td><small>${escHtml(ga.dpt || '')}</small></td>
         <td><small class="text-muted">${escHtml(ga.comment || '')}</small></td>
         <td class="text-center">${dirIcon}</td>
-        <td>${routesBadge}</td>
+        <td>${routesBadge}${repeatBadge}</td>
         <td><strong>${escHtml(ga.lastValue !== undefined && ga.lastValue !== null ? formatValue(ga.lastValue, ga.dpt) : '–')}</strong></td>
         <td class="text-end text-nowrap">
           <button class="btn btn-sm btn-outline-secondary btn-edit-ga me-1" data-address="${escHtml(ga.address)}" aria-label="Edit"><i class="bi bi-pencil-fill"></i></button>
@@ -448,17 +462,18 @@
   }
 
   // ── Add / Edit modal ──────────────────────────────────────────────────────────
-  const gaModal     = new bootstrap.Modal(document.getElementById('gaModal'));
-  const addrInput   = document.getElementById('ga-address');
-  const nameInput   = document.getElementById('ga-name');
-  const dptInput    = document.getElementById('ga-dpt');
+  const gaModal      = new bootstrap.Modal(document.getElementById('gaModal'));
+  const addrInput    = document.getElementById('ga-address');
+  const nameInput    = document.getElementById('ga-name');
+  const dptInput     = document.getElementById('ga-dpt');
   const commentInput = document.getElementById('ga-comment');
-  const dirSelect   = document.getElementById('ga-direction');
-  const formError   = document.getElementById('ga-form-error');
-  const routesList  = document.getElementById('ga-routes-list');
+  const dirSelect    = document.getElementById('ga-direction');
+  const repeatInput  = document.getElementById('ga-repeat-interval');
+  const formError    = document.getElementById('ga-form-error');
+  const routesList   = document.getElementById('ga-routes-list');
 
   /** Render one route row in the modal. */
-  function addRouteRow(topic, valueMapStr) {
+  function addRouteRow(topic, valueMapStr, repeatInterval) {
     const row = document.createElement('div');
     row.className = 'route-row';
     row.innerHTML = `
@@ -467,9 +482,19 @@
         <label class="form-label form-label-sm mb-1">MQTT Topic <span class="text-danger">*</span></label>
         <input type="text" class="form-control form-control-sm route-topic" placeholder="e.g. Sonos/Living/control" value="${escHtml(topic || '')}">
       </div>
-      <div>
+      <div class="mb-2">
         <label class="form-label form-label-sm mb-1">Value Map <small class="text-muted">(JSON, optional – e.g. {"ON":"PLAY","OFF":"STOP"})</small></label>
         <input type="text" class="form-control form-control-sm route-valuemap" placeholder='{"ON":"PLAY","OFF":"STOP"}' value="${escHtml(valueMapStr || '')}">
+      </div>
+      <div>
+        <label class="form-label form-label-sm mb-1">
+          Repeat Interval
+          <small class="text-muted">(seconds, optional – re-publish to this topic at this rate)</small>
+        </label>
+        <div class="input-group input-group-sm">
+          <input type="number" class="form-control form-control-sm route-repeat-interval" placeholder="e.g. 5" min="0" step="1" value="${escHtml(repeatInterval > 0 ? String(repeatInterval) : '')}">
+          <span class="input-group-text">seconds</span>
+        </div>
       </div>
     `;
     row.querySelector('.btn-remove-route').addEventListener('click', () => row.remove());
@@ -489,8 +514,11 @@
       if (vmRaw) {
         try { valueMap = JSON.parse(vmRaw); } catch (_) { valueMap = undefined; }
       }
+      const riRaw = row.querySelector('.route-repeat-interval').value.trim();
+      const repeatInterval = riRaw ? Number(riRaw) : 0;
       const route = { mqttTopic };
       if (valueMap && typeof valueMap === 'object') route.valueMap = valueMap;
+      if (repeatInterval > 0) route.repeatInterval = repeatInterval;
       routes.push(route);
     }
     return routes.length ? routes : undefined;
@@ -507,11 +535,12 @@
     dptInput.value     = ga ? (ga.dpt     || '') : '';
     commentInput.value = ga ? (ga.comment || '') : '';
     dirSelect.value    = ga ? (ga.direction || 'both') : 'both';
+    repeatInput.value  = ga && ga.repeatInterval > 0 ? ga.repeatInterval : '';
     // Populate existing routes
     if (ga && Array.isArray(ga.routes)) {
       ga.routes.forEach((r) => {
         const vmStr = r.valueMap ? JSON.stringify(r.valueMap) : '';
-        addRouteRow(r.mqttTopic || '', vmStr);
+        addRouteRow(r.mqttTopic || '', vmStr, r.repeatInterval || 0);
       });
     }
     gaModal.show();
@@ -596,6 +625,7 @@
       return;
     }
     const routes = collectRoutes();
+    const repeatInterval = parseFloat(repeatInput.value) || 0;
     const body = {
       address,
       name:      nameInput.value.trim(),
@@ -603,6 +633,7 @@
       comment:   commentInput.value.trim(),
       direction: dirSelect.value || 'both',
     };
+    if (repeatInterval > 0) body.repeatInterval = repeatInterval;
     if (routes) body.routes = routes;
     fetch('/api/groupaddresses', {
       method:  'POST',
