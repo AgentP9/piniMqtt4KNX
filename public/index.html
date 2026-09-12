@@ -279,9 +279,15 @@
   integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
   crossorigin="anonymous"
 ></script>
+<script src="/valueMapEditor.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
   const socket = io();
+  const {
+    isVisualRuleCompatibleValueMap,
+    parseAdvancedValueMap,
+    serializeVisualRulePairs,
+  } = window.ValueMapEditor;
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   function escHtml(str) {
@@ -495,17 +501,6 @@
     rulesList.appendChild(ruleRow);
   }
 
-  function isVisualRuleCompatibleValueMap(valueMap) {
-    return Boolean(valueMap)
-      && typeof valueMap === 'object'
-      && !Array.isArray(valueMap)
-      && Object.entries(valueMap).every(([key, value]) =>
-        typeof value === 'string'
-        && key === key.trim()
-        && value === value.trim()
-      );
-  }
-
   /** Render one route row in the modal. */
   function addRouteRow(topic, valueMap, repeatInterval) {
     const useVisualRules = isVisualRuleCompatibleValueMap(valueMap);
@@ -555,27 +550,30 @@
   /** Collect route rows from the modal into an array (or undefined if empty). */
   function collectRoutes() {
     const rows = routesList.querySelectorAll('.route-row');
-    if (!rows.length) return undefined;
+    if (!rows.length) return { routes: undefined };
     const routes = [];
     for (const row of rows) {
       const mqttTopic = row.querySelector('.route-topic').value.trim();
       if (!mqttTopic) continue;
       let valueMap;
-      const rawValueMap = row.querySelector('.route-valuemap-json').value.trim();
-      if (rawValueMap) {
-        try {
-          valueMap = JSON.parse(rawValueMap);
-        } catch (_) {
-          valueMap = undefined;
+      const rawValueMap = row.querySelector('.route-valuemap-json').value;
+      if (rawValueMap.trim()) {
+        const parsedValueMap = parseAdvancedValueMap(rawValueMap);
+        if (!parsedValueMap.ok) {
+          return { error: `${mqttTopic}: ${parsedValueMap.error}` };
         }
+        valueMap = parsedValueMap.valueMap;
       } else {
-        row.querySelectorAll('.route-rule-row').forEach((ruleRow) => {
-          const sourceValue = ruleRow.querySelector('.route-rule-source').value.trim();
-          if (!sourceValue.length) return;
-          const targetValue = ruleRow.querySelector('.route-rule-target').value.trim();
-          if (!valueMap) valueMap = {};
-          valueMap[sourceValue] = targetValue;
-        });
+        const visualValueMap = serializeVisualRulePairs(
+          [...row.querySelectorAll('.route-rule-row')].map((ruleRow) => ({
+            sourceValue: ruleRow.querySelector('.route-rule-source').value,
+            targetValue: ruleRow.querySelector('.route-rule-target').value,
+          }))
+        );
+        if (!visualValueMap.ok) {
+          return { error: `${mqttTopic}: ${visualValueMap.error}` };
+        }
+        valueMap = visualValueMap.valueMap;
       }
       const riRaw = row.querySelector('.route-repeat-interval').value.trim();
       const repeatInterval = riRaw ? Number(riRaw) : 0;
@@ -584,7 +582,7 @@
       if (repeatInterval > 0) route.repeatInterval = repeatInterval;
       routes.push(route);
     }
-    return routes.length ? routes : undefined;
+    return { routes: routes.length ? routes : undefined };
   }
 
   function openModal(prefillAddress, editMode) {
@@ -686,7 +684,13 @@
       formError.classList.remove('d-none');
       return;
     }
-    const routes = collectRoutes();
+    const routeResult = collectRoutes();
+    if (routeResult.error) {
+      formError.textContent = routeResult.error;
+      formError.classList.remove('d-none');
+      return;
+    }
+    const { routes } = routeResult;
     const repeatInterval = parseFloat(repeatInput.value) || 0;
     const body = {
       address,
