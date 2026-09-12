@@ -12,10 +12,16 @@ const {
 test('visual rules support plain trimmed string maps', () => {
   assert.equal(isVisualRuleCompatibleValueMap({ ON: 'PLAY', OFF: 'STOP' }), true);
   assert.equal(isVisualRuleCompatibleValueMap({ ' ON ': 'PLAY' }), false);
+  assert.equal(isVisualRuleCompatibleValueMap({ '': 'PLAY' }), false);
+  assert.equal(isVisualRuleCompatibleValueMap({ ON: '' }), true);
   assert.equal(isVisualRuleCompatibleValueMap({ ON: true }), false);
 });
 
 test('advanced JSON parser preserves typed payload maps and rejects invalid input', () => {
+  assert.deepEqual(parseAdvancedValueMap('   '), {
+    ok: true,
+    valueMap: undefined,
+  });
   assert.deepEqual(parseAdvancedValueMap('{"ON":true,"level":42,"off":null}'), {
     ok: true,
     valueMap: { ON: true, level: 42, off: null },

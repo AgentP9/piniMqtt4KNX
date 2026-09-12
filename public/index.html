@@ -520,7 +520,7 @@
           </label>
           <button type="button" class="btn btn-sm btn-outline-secondary btn-add-route-rule">+ Rule</button>
         </div>
-        <div class="route-rules-list"></div>
+        <div class="route-rules-list" aria-live="polite" aria-label="Configured visual rules"></div>
         <div class="form-text">Node-RED-style rule builder: when the KNX value matches, publish the configured MQTT payload. Visual rules reject leading/trailing spaces; use the advanced JSON field below for whitespace-sensitive values. If nothing matches, the original value is forwarded unchanged.</div>
         <label class="form-label form-label-sm mt-2 mb-1">Advanced Value Map JSON <small class="text-muted">(optional – required for whitespace-sensitive values, numbers, booleans or null payloads)</small></label>
         <textarea class="form-control form-control-sm route-valuemap-json" rows="2" placeholder='{"ON":"PLAY","level":42}'>${escHtml(!useVisualRules && valueMap ? JSON.stringify(valueMap) : '')}</textarea>
