@@ -492,9 +492,9 @@
     const ruleRow = document.createElement('div');
     ruleRow.className = 'route-rule-row';
     ruleRow.innerHTML = `
-      <input type="text" class="form-control form-control-sm route-rule-source" placeholder="when KNX value is…" aria-label="KNX match value" value="${escHtml(sourceValue || '')}">
+      <input type="text" class="form-control form-control-sm route-rule-source" placeholder="when KNX value is…" aria-label="KNX match value" value="${escHtml(sourceValue ?? '')}">
       <span class="route-rule-arrow">→</span>
-      <input type="text" class="form-control form-control-sm route-rule-target" placeholder="send MQTT payload…" aria-label="MQTT payload" value="${escHtml(targetValue || '')}">
+      <input type="text" class="form-control form-control-sm route-rule-target" placeholder="send MQTT payload…" aria-label="MQTT payload" value="${escHtml(targetValue ?? '')}">
       <button type="button" class="btn btn-sm btn-outline-danger btn-remove-route-rule" aria-label="Remove rule"><i class="bi bi-x-lg"></i></button>
     `;
     ruleRow.querySelector('.btn-remove-route-rule').addEventListener('click', () => ruleRow.remove());
@@ -521,7 +521,7 @@
           <button type="button" class="btn btn-sm btn-outline-secondary btn-add-route-rule">+ Rule</button>
         </div>
         <div class="route-rules-list"></div>
-        <div class="form-text">Node-RED-style rule builder: when the KNX value matches, publish the configured MQTT payload. Visual rules trim leading/trailing spaces; use the advanced JSON field below for whitespace-sensitive values. If nothing matches, the original value is forwarded unchanged.</div>
+        <div class="form-text">Node-RED-style rule builder: when the KNX value matches, publish the configured MQTT payload. Visual rules reject leading/trailing spaces; use the advanced JSON field below for whitespace-sensitive values. If nothing matches, the original value is forwarded unchanged.</div>
         <label class="form-label form-label-sm mt-2 mb-1">Advanced Value Map JSON <small class="text-muted">(optional – required for whitespace-sensitive values, numbers, booleans or null payloads)</small></label>
         <textarea class="form-control form-control-sm route-valuemap-json" rows="2" placeholder='{"ON":"PLAY","level":42}'>${escHtml(!useVisualRules && valueMap ? JSON.stringify(valueMap) : '')}</textarea>
       </div>

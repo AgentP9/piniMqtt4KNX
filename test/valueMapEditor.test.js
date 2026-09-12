@@ -28,6 +28,14 @@ test('advanced JSON parser preserves typed payload maps and rejects invalid inpu
     ok: false,
     error: 'Advanced Value Map JSON must be an object.',
   });
+  assert.deepEqual(parseAdvancedValueMap(0), {
+    ok: false,
+    error: 'Advanced Value Map JSON must be an object.',
+  });
+  assert.deepEqual(parseAdvancedValueMap(false), {
+    ok: false,
+    error: 'Advanced Value Map JSON must be an object.',
+  });
 });
 
 test('visual rule serializer rejects whitespace-sensitive inputs', () => {

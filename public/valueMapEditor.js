@@ -19,7 +19,7 @@
   }
 
   function parseAdvancedValueMap(rawValueMap) {
-    const text = String(rawValueMap || '').trim();
+    const text = String(rawValueMap ?? '').trim();
     if (!text) return { ok: true, valueMap: undefined };
     try {
       const valueMap = JSON.parse(text);
