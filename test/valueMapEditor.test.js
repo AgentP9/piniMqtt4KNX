@@ -45,4 +45,11 @@ test('visual rule serializer rejects whitespace-sensitive inputs', () => {
     ok: false,
     error: 'Visual rules do not allow leading or trailing spaces. Use Advanced Value Map JSON for whitespace-sensitive values.',
   });
+
+  assert.deepEqual(serializeVisualRulePairs([
+    { sourceValue: '', targetValue: 'PLAY' },
+  ]), {
+    ok: false,
+    error: 'Visual rules require a KNX match value. Use Advanced Value Map JSON for empty-string keys.',
+  });
 });

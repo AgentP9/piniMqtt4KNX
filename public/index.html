@@ -492,9 +492,9 @@
     const ruleRow = document.createElement('div');
     ruleRow.className = 'route-rule-row';
     ruleRow.innerHTML = `
-      <input type="text" class="form-control form-control-sm route-rule-source" placeholder="when KNX value is…" value="${escHtml(sourceValue || '')}">
+      <input type="text" class="form-control form-control-sm route-rule-source" placeholder="when KNX value is…" aria-label="KNX match value" value="${escHtml(sourceValue || '')}">
       <span class="route-rule-arrow">→</span>
-      <input type="text" class="form-control form-control-sm route-rule-target" placeholder="send MQTT payload…" value="${escHtml(targetValue || '')}">
+      <input type="text" class="form-control form-control-sm route-rule-target" placeholder="send MQTT payload…" aria-label="MQTT payload" value="${escHtml(targetValue || '')}">
       <button type="button" class="btn btn-sm btn-outline-danger btn-remove-route-rule" aria-label="Remove rule"><i class="bi bi-x-lg"></i></button>
     `;
     ruleRow.querySelector('.btn-remove-route-rule').addEventListener('click', () => ruleRow.remove());

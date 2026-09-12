@@ -37,7 +37,13 @@
     for (const rule of rulePairs || []) {
       const sourceValue = String(rule && rule.sourceValue !== undefined ? rule.sourceValue : '');
       const targetValue = String(rule && rule.targetValue !== undefined ? rule.targetValue : '');
-      if (!sourceValue.length) continue;
+      if (!sourceValue.length && !targetValue.length) continue;
+      if (!sourceValue.length) {
+        return {
+          ok: false,
+          error: 'Visual rules require a KNX match value. Use Advanced Value Map JSON for empty-string keys.',
+        };
+      }
       if (sourceValue !== sourceValue.trim() || targetValue !== targetValue.trim()) {
         return {
           ok: false,
