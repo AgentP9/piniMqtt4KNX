@@ -10,6 +10,7 @@ A Docker-based **KNX ↔ MQTT gateway** with a live web traffic dashboard.
 - **KNX → MQTT**: every `GroupValue_Write` on the KNX bus is published to `<prefix>/<address>` (e.g. `knx/9/0/1`)
 - **MQTT → KNX**: messages received on `<prefix>/<address>` are written back to the corresponding KNX group address
 - **Per-address routing direction**: configure each group address as bidirectional (default), KNX→MQTT only, or MQTT→KNX only
+- **Node-RED-style route rules in the dashboard**: define exact-match KNX→MQTT payload mappings with a visual rule builder instead of raw JSON
 - **Repeat publishing**: optionally re-publish the last KNX value to MQTT at a fixed interval until a new KNX message arrives
 - **Web dashboard** (port 3000) showing live telegram traffic, connection status and the configured group addresses
 
@@ -119,6 +120,8 @@ Example for GA `9/1/0`:
 An automation rule that must act on every repeat tick should **subscribe to `…/ts`** and read the value from the primary topic.
 
 `repeatInterval` can also be set individually on each custom route entry, allowing different repeat rates per MQTT topic.
+
+When editing custom routes in the dashboard, the `valueMap` is exposed as a **visual rule list** (“when KNX value → send MQTT payload”), making it easier to define precise Node-RED-style mappings without manually typing JSON.
 
 ### 3. Run
 

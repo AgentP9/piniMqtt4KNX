@@ -66,6 +66,15 @@
     /* Routes list inside the modal */
     .route-row { border: 1px solid var(--bs-border-color); border-radius: 0.375rem; padding: 0.5rem; margin-bottom: 0.5rem; position: relative; }
     .route-row .btn-remove-route { position: absolute; top: 0.25rem; right: 0.25rem; }
+    .route-rule-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .route-rule-row:last-child { margin-bottom: 0; }
+    .route-rule-arrow { color: var(--bs-secondary-color); font-size: 0.9rem; }
     .repeat-icon { font-size: 0.75rem; }
   </style>
 </head>
@@ -473,8 +482,21 @@
   const formError    = document.getElementById('ga-form-error');
   const routesList   = document.getElementById('ga-routes-list');
 
+  function addRouteRuleRow(rulesList, sourceValue, targetValue) {
+    const ruleRow = document.createElement('div');
+    ruleRow.className = 'route-rule-row';
+    ruleRow.innerHTML = `
+      <input type="text" class="form-control form-control-sm route-rule-source" placeholder="when KNX value is…" value="${escHtml(sourceValue || '')}">
+      <span class="route-rule-arrow">→</span>
+      <input type="text" class="form-control form-control-sm route-rule-target" placeholder="send MQTT payload…" value="${escHtml(targetValue || '')}">
+      <button type="button" class="btn btn-sm btn-outline-danger btn-remove-route-rule" aria-label="Remove rule"><i class="bi bi-x-lg"></i></button>
+    `;
+    ruleRow.querySelector('.btn-remove-route-rule').addEventListener('click', () => ruleRow.remove());
+    rulesList.appendChild(ruleRow);
+  }
+
   /** Render one route row in the modal. */
-  function addRouteRow(topic, valueMapStr, repeatInterval) {
+  function addRouteRow(topic, valueMap, repeatInterval) {
     const row = document.createElement('div');
     row.className = 'route-row';
     row.innerHTML = `
@@ -484,8 +506,15 @@
         <input type="text" class="form-control form-control-sm route-topic" placeholder="e.g. Sonos/Living/control" value="${escHtml(topic || '')}">
       </div>
       <div class="mb-2">
-        <label class="form-label form-label-sm mb-1">Value Map <small class="text-muted">(JSON, optional – e.g. {"ON":"PLAY","OFF":"STOP"})</small></label>
-        <input type="text" class="form-control form-control-sm route-valuemap" placeholder='{"ON":"PLAY","OFF":"STOP"}' value="${escHtml(valueMapStr || '')}">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <label class="form-label form-label-sm mb-0">
+            Rules
+            <small class="text-muted">(optional exact-match mappings)</small>
+          </label>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-add-route-rule">+ Rule</button>
+        </div>
+        <div class="route-rules-list"></div>
+        <div class="form-text">Node-RED-style rule builder: when the KNX value matches, publish the configured MQTT payload. If nothing matches, the original value is forwarded unchanged.</div>
       </div>
       <div>
         <label class="form-label form-label-sm mb-1">
@@ -499,6 +528,13 @@
       </div>
     `;
     row.querySelector('.btn-remove-route').addEventListener('click', () => row.remove());
+    const rulesList = row.querySelector('.route-rules-list');
+    row.querySelector('.btn-add-route-rule').addEventListener('click', () => addRouteRuleRow(rulesList, '', ''));
+    if (valueMap && typeof valueMap === 'object' && !Array.isArray(valueMap)) {
+      Object.entries(valueMap).forEach(([sourceValue, targetValue]) => {
+        addRouteRuleRow(rulesList, sourceValue, String(targetValue));
+      });
+    }
     routesList.appendChild(row);
   }
 
@@ -510,11 +546,14 @@
     for (const row of rows) {
       const mqttTopic = row.querySelector('.route-topic').value.trim();
       if (!mqttTopic) continue;
-      const vmRaw = row.querySelector('.route-valuemap').value.trim();
       let valueMap;
-      if (vmRaw) {
-        try { valueMap = JSON.parse(vmRaw); } catch (_) { valueMap = undefined; }
-      }
+      row.querySelectorAll('.route-rule-row').forEach((ruleRow) => {
+        const sourceValue = ruleRow.querySelector('.route-rule-source').value.trim();
+        if (!sourceValue) return;
+        const targetValue = ruleRow.querySelector('.route-rule-target').value;
+        if (!valueMap) valueMap = {};
+        valueMap[sourceValue] = targetValue;
+      });
       const riRaw = row.querySelector('.route-repeat-interval').value.trim();
       const repeatInterval = riRaw ? Number(riRaw) : 0;
       const route = { mqttTopic };
@@ -540,15 +579,14 @@
     // Populate existing routes
     if (ga && Array.isArray(ga.routes)) {
       ga.routes.forEach((r) => {
-        const vmStr = r.valueMap ? JSON.stringify(r.valueMap) : '';
-        addRouteRow(r.mqttTopic || '', vmStr, r.repeatInterval || 0);
+        addRouteRow(r.mqttTopic || '', r.valueMap, r.repeatInterval || 0);
       });
     }
     gaModal.show();
     if (!addrInput.readOnly) addrInput.focus();
   }
 
-  document.getElementById('btn-add-route').addEventListener('click', () => addRouteRow('', ''));
+  document.getElementById('btn-add-route').addEventListener('click', () => addRouteRow('', undefined));
 
   document.getElementById('btn-add-ga').addEventListener('click', () => openModal(''));
 
