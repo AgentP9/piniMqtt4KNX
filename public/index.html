@@ -534,7 +534,7 @@
           <button type="button" class="btn btn-sm btn-outline-secondary btn-add-route-rule">+ Rule</button>
         </div>
         <div class="route-rules-list" aria-live="polite" aria-label="Configured visual rules" aria-describedby="${rulesHelpId}"></div>
-        <div class="form-text" id="${rulesHelpId}">Node-RED-style rule builder: when the KNX value matches, publish the configured MQTT payload. Visual rules reject leading/trailing spaces; use the advanced JSON field below for whitespace-sensitive values. If nothing matches, the original value is forwarded unchanged.</div>
+        <div class="form-text" id="${rulesHelpId}">Node-RED-style rule builder for exact-match KNX-to-MQTT mappings. Visual rules reject leading/trailing spaces; use the advanced JSON field below for whitespace-sensitive values.</div>
         <label class="form-label form-label-sm mt-2 mb-1">Advanced Value Map JSON <small class="text-muted">(optional – required for empty-string keys, whitespace-sensitive values, numbers, booleans or null payloads)</small></label>
         <textarea class="form-control form-control-sm route-valuemap-json" rows="2" placeholder='{"ON":"PLAY","level":42}' aria-describedby="${jsonHelpId}">${escHtml(!useVisualRules && valueMap ? JSON.stringify(valueMap) : '')}</textarea>
         <div class="form-text" id="${jsonHelpId}">Use advanced JSON when a mapping needs empty-string keys, typed payloads, whitespace-sensitive values, or other keys that cannot be represented in the visual rule editor. While this field contains JSON, the visual rule controls are disabled.</div>
@@ -580,7 +580,7 @@
         ruleRow.querySelector('.route-rule-source').value.length
         || ruleRow.querySelector('.route-rule-target').value.length
       );
-      const hasRouteContent = Boolean(rawValueMap.trim() || riRaw || hasVisualRuleContent);
+      const hasRouteContent = Boolean(rawValueMap.trim() || hasVisualRuleContent);
       if (!mqttTopic && hasRouteContent) {
         return { error: 'Each configured route needs an MQTT topic.' };
       }
