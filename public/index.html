@@ -495,8 +495,16 @@
     rulesList.appendChild(ruleRow);
   }
 
+  function isStringOnlyValueMap(valueMap) {
+    return Boolean(valueMap)
+      && typeof valueMap === 'object'
+      && !Array.isArray(valueMap)
+      && Object.values(valueMap).every((value) => typeof value === 'string');
+  }
+
   /** Render one route row in the modal. */
   function addRouteRow(topic, valueMap, repeatInterval) {
+    const useVisualRules = isStringOnlyValueMap(valueMap);
     const row = document.createElement('div');
     row.className = 'route-row';
     row.innerHTML = `
@@ -515,6 +523,8 @@
         </div>
         <div class="route-rules-list"></div>
         <div class="form-text">Node-RED-style rule builder: when the KNX value matches, publish the configured MQTT payload. If nothing matches, the original value is forwarded unchanged.</div>
+        <label class="form-label form-label-sm mt-2 mb-1">Advanced Value Map JSON <small class="text-muted">(optional – required for numbers, booleans or null payloads)</small></label>
+        <textarea class="form-control form-control-sm route-valuemap-json" rows="2" placeholder='{"ON":"PLAY","level":42}'>${escHtml(!useVisualRules && valueMap ? JSON.stringify(valueMap) : '')}</textarea>
       </div>
       <div>
         <label class="form-label form-label-sm mb-1">
@@ -530,9 +540,9 @@
     row.querySelector('.btn-remove-route').addEventListener('click', () => row.remove());
     const rulesList = row.querySelector('.route-rules-list');
     row.querySelector('.btn-add-route-rule').addEventListener('click', () => addRouteRuleRow(rulesList, '', ''));
-    if (valueMap && typeof valueMap === 'object' && !Array.isArray(valueMap)) {
+    if (useVisualRules) {
       Object.entries(valueMap).forEach(([sourceValue, targetValue]) => {
-        addRouteRuleRow(rulesList, sourceValue, String(targetValue));
+        addRouteRuleRow(rulesList, sourceValue, targetValue);
       });
     }
     routesList.appendChild(row);
@@ -547,13 +557,22 @@
       const mqttTopic = row.querySelector('.route-topic').value.trim();
       if (!mqttTopic) continue;
       let valueMap;
-      row.querySelectorAll('.route-rule-row').forEach((ruleRow) => {
-        const sourceValue = ruleRow.querySelector('.route-rule-source').value.trim();
-        if (!sourceValue) return;
-        const targetValue = ruleRow.querySelector('.route-rule-target').value;
-        if (!valueMap) valueMap = {};
-        valueMap[sourceValue] = targetValue;
-      });
+      const rawValueMap = row.querySelector('.route-valuemap-json').value.trim();
+      if (rawValueMap) {
+        try {
+          valueMap = JSON.parse(rawValueMap);
+        } catch (_) {
+          valueMap = undefined;
+        }
+      } else {
+        row.querySelectorAll('.route-rule-row').forEach((ruleRow) => {
+          const sourceValue = ruleRow.querySelector('.route-rule-source').value;
+          if (!sourceValue.length) return;
+          const targetValue = ruleRow.querySelector('.route-rule-target').value;
+          if (!valueMap) valueMap = {};
+          valueMap[sourceValue] = targetValue;
+        });
+      }
       const riRaw = row.querySelector('.route-repeat-interval').value.trim();
       const repeatInterval = riRaw ? Number(riRaw) : 0;
       const route = { mqttTopic };
