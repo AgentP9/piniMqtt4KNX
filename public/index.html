@@ -487,6 +487,7 @@
   const repeatInput  = document.getElementById('ga-repeat-interval');
   const formError    = document.getElementById('ga-form-error');
   const routesList   = document.getElementById('ga-routes-list');
+  let routeEditorId = 0;
 
   function addRouteRuleRow(rulesList, sourceValue, targetValue) {
     const ruleRow = document.createElement('div');
@@ -503,7 +504,12 @@
 
   /** Render one route row in the modal. */
   function addRouteRow(topic, valueMap, repeatInterval) {
-    const useVisualRules = isVisualRuleCompatibleValueMap(valueMap);
+    const useVisualRules = Boolean(valueMap)
+      && isVisualRuleCompatibleValueMap(valueMap)
+      && Object.entries(valueMap).every(([, targetValue]) => typeof targetValue === 'string');
+    const rulesHelpId = `route-rules-help-${routeEditorId}`;
+    const jsonHelpId = `route-valuemap-json-help-${routeEditorId}`;
+    routeEditorId++;
     const row = document.createElement('div');
     row.className = 'route-row';
     row.innerHTML = `
@@ -520,10 +526,11 @@
           </label>
           <button type="button" class="btn btn-sm btn-outline-secondary btn-add-route-rule">+ Rule</button>
         </div>
-        <div class="route-rules-list" aria-live="polite" aria-label="Configured visual rules"></div>
-        <div class="form-text">Node-RED-style rule builder: when the KNX value matches, publish the configured MQTT payload. Visual rules reject leading/trailing spaces; use the advanced JSON field below for whitespace-sensitive values. If nothing matches, the original value is forwarded unchanged.</div>
+        <div class="route-rules-list" aria-live="polite" aria-label="Configured visual rules" aria-describedby="${rulesHelpId}"></div>
+        <div class="form-text" id="${rulesHelpId}">Node-RED-style rule builder: when the KNX value matches, publish the configured MQTT payload. Visual rules reject leading/trailing spaces; use the advanced JSON field below for whitespace-sensitive values. If nothing matches, the original value is forwarded unchanged.</div>
         <label class="form-label form-label-sm mt-2 mb-1">Advanced Value Map JSON <small class="text-muted">(optional – required for whitespace-sensitive values, numbers, booleans or null payloads)</small></label>
-        <textarea class="form-control form-control-sm route-valuemap-json" rows="2" placeholder='{"ON":"PLAY","level":42}'>${escHtml(!useVisualRules && valueMap ? JSON.stringify(valueMap) : '')}</textarea>
+        <textarea class="form-control form-control-sm route-valuemap-json" rows="2" placeholder='{"ON":"PLAY","level":42}' aria-describedby="${jsonHelpId}">${escHtml(!useVisualRules && valueMap ? JSON.stringify(valueMap) : '')}</textarea>
+        <div class="form-text" id="${jsonHelpId}">Use advanced JSON when a mapping needs typed payloads, whitespace-sensitive values, or keys that cannot be represented in the visual rule editor.</div>
       </div>
       <div>
         <label class="form-label form-label-sm mb-1">
