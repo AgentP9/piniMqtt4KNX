@@ -121,7 +121,7 @@ An automation rule that must act on every repeat tick should **subscribe to `…
 
 `repeatInterval` can also be set individually on each custom route entry, allowing different repeat rates per MQTT topic.
 
-When editing custom routes in the dashboard, the `valueMap` is exposed as a **visual rule list** (“when KNX value → send MQTT payload”), making it easier to define precise Node-RED-style mappings without manually typing JSON. An advanced JSON field remains available for empty-string keys, whitespace-sensitive keys/payloads, and typed payloads such as numbers, booleans or `null`.
+When editing custom routes in the dashboard, the `valueMap` is exposed as a **visual rule list** (“when KNX value → send MQTT payload”), making it easier to define precise Node-RED-style mappings without manually typing JSON. An advanced JSON field remains available for empty-string keys, whitespace-sensitive keys/payloads, and typed payloads such as numbers, booleans or `null`; when it contains JSON, the visual rule controls are disabled so there is only one active editor for that route.
 
 ### 3. Run
 
