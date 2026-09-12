@@ -541,6 +541,7 @@
     row.querySelector('.btn-add-route-rule').addEventListener('click', () => addRouteRuleRow(rulesList, '', ''));
     if (useVisualRules) {
       Object.entries(valueMap).forEach(([sourceValue, targetValue]) => {
+        if (typeof targetValue !== 'string') return;
         addRouteRuleRow(rulesList, sourceValue, targetValue);
       });
     }
