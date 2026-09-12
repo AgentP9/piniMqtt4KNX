@@ -574,9 +574,18 @@
     const routes = [];
     for (const row of rows) {
       const mqttTopic = row.querySelector('.route-topic').value.trim();
+      const rawValueMap = row.querySelector('.route-valuemap-json').value;
+      const riRaw = row.querySelector('.route-repeat-interval').value.trim();
+      const hasVisualRuleContent = [...row.querySelectorAll('.route-rule-row')].some((ruleRow) =>
+        ruleRow.querySelector('.route-rule-source').value.length
+        || ruleRow.querySelector('.route-rule-target').value.length
+      );
+      const hasRouteContent = Boolean(rawValueMap.trim() || riRaw || hasVisualRuleContent);
+      if (!mqttTopic && hasRouteContent) {
+        return { error: 'Each configured route needs an MQTT topic.' };
+      }
       if (!mqttTopic) continue;
       let valueMap;
-      const rawValueMap = row.querySelector('.route-valuemap-json').value;
       if (rawValueMap.trim()) {
         const parsedValueMap = parseAdvancedValueMap(rawValueMap);
         if (!parsedValueMap.ok) {
@@ -595,7 +604,6 @@
         }
         valueMap = visualValueMap.valueMap;
       }
-      const riRaw = row.querySelector('.route-repeat-interval').value.trim();
       const repeatInterval = riRaw ? Number(riRaw) : 0;
       const route = { mqttTopic };
       if (valueMap && typeof valueMap === 'object') route.valueMap = valueMap;
