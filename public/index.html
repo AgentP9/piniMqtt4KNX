@@ -495,16 +495,20 @@
     rulesList.appendChild(ruleRow);
   }
 
-  function isStringOnlyValueMap(valueMap) {
+  function isVisualRuleCompatibleValueMap(valueMap) {
     return Boolean(valueMap)
       && typeof valueMap === 'object'
       && !Array.isArray(valueMap)
-      && Object.values(valueMap).every((value) => typeof value === 'string');
+      && Object.entries(valueMap).every(([key, value]) =>
+        typeof value === 'string'
+        && key === key.trim()
+        && value === value.trim()
+      );
   }
 
   /** Render one route row in the modal. */
   function addRouteRow(topic, valueMap, repeatInterval) {
-    const useVisualRules = isStringOnlyValueMap(valueMap);
+    const useVisualRules = isVisualRuleCompatibleValueMap(valueMap);
     const row = document.createElement('div');
     row.className = 'route-row';
     row.innerHTML = `
@@ -522,8 +526,8 @@
           <button type="button" class="btn btn-sm btn-outline-secondary btn-add-route-rule">+ Rule</button>
         </div>
         <div class="route-rules-list"></div>
-        <div class="form-text">Node-RED-style rule builder: when the KNX value matches, publish the configured MQTT payload. If nothing matches, the original value is forwarded unchanged.</div>
-        <label class="form-label form-label-sm mt-2 mb-1">Advanced Value Map JSON <small class="text-muted">(optional – required for numbers, booleans or null payloads)</small></label>
+        <div class="form-text">Node-RED-style rule builder: when the KNX value matches, publish the configured MQTT payload. Visual rules trim leading/trailing spaces; use the advanced JSON field below for whitespace-sensitive values. If nothing matches, the original value is forwarded unchanged.</div>
+        <label class="form-label form-label-sm mt-2 mb-1">Advanced Value Map JSON <small class="text-muted">(optional – required for whitespace-sensitive values, numbers, booleans or null payloads)</small></label>
         <textarea class="form-control form-control-sm route-valuemap-json" rows="2" placeholder='{"ON":"PLAY","level":42}'>${escHtml(!useVisualRules && valueMap ? JSON.stringify(valueMap) : '')}</textarea>
       </div>
       <div>
@@ -566,9 +570,9 @@
         }
       } else {
         row.querySelectorAll('.route-rule-row').forEach((ruleRow) => {
-          const sourceValue = ruleRow.querySelector('.route-rule-source').value;
+          const sourceValue = ruleRow.querySelector('.route-rule-source').value.trim();
           if (!sourceValue.length) return;
-          const targetValue = ruleRow.querySelector('.route-rule-target').value;
+          const targetValue = ruleRow.querySelector('.route-rule-target').value.trim();
           if (!valueMap) valueMap = {};
           valueMap[sourceValue] = targetValue;
         });
