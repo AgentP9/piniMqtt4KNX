@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const path = require('path');
 
 const groupAddressesPath =
   process.env.GROUP_ADDRESSES_PATH || '/app/config/groupaddresses.json';
@@ -27,6 +28,12 @@ module.exports = {
   },
   topicPrefix: process.env.MQTT_TOPIC_PREFIX || 'knx',
   webPort: parseInt(process.env.WEB_PORT, 10) || 3000,
+  nodeRed: {
+    adminRoot: process.env.NODE_RED_ADMIN_ROOT || '/red',
+    httpNodeRoot: process.env.NODE_RED_HTTP_NODE_ROOT || '/red/api',
+    userDir: process.env.NODE_RED_USER_DIR || path.join(path.dirname(groupAddressesPath), 'nodered'),
+    flowFile: process.env.NODE_RED_FLOW_FILE || 'flows.json',
+  },
   groupAddressesPath,
   groupAddresses,
 };

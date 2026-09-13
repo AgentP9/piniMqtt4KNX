@@ -1,0 +1,49 @@
+<script type="text/x-red" data-template-name="pini-timer">
+  <div class="form-row">
+    <label for="node-input-mode"><i class="fa fa-clock-o"></i> Mode</label>
+    <select id="node-input-mode">
+      <option value="delay">Delay once</option>
+      <option value="interval">Repeat interval</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label for="node-input-amount"><i class="fa fa-hourglass-half"></i> Amount</label>
+    <input type="number" id="node-input-amount" min="1" step="1">
+  </div>
+  <div class="form-row">
+    <label for="node-input-unit"><i class="fa fa-calendar"></i> Unit</label>
+    <select id="node-input-unit">
+      <option value="seconds">Seconds</option>
+      <option value="minutes">Minutes</option>
+      <option value="hours">Hours</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="Optional label">
+  </div>
+</script>
+
+<script type="text/x-red" data-help-name="pini-timer">
+  <p>Delays or repeats a message without leaving the piniMqtt4KNX automation palette.</p>
+  <p>Set <code>msg.reset</code> to stop an active interval. Set <code>msg.delayMs</code> to override the configured delay for a single message.</p>
+</script>
+
+<script type="text/javascript">
+  RED.nodes.registerType('pini-timer', {
+    category: 'piniMqtt4KNX',
+    color: '#fff3cd',
+    defaults: {
+      name: { value: '' },
+      mode: { value: 'delay' },
+      amount: { value: 1, required: true, validate: RED.validators.number() },
+      unit: { value: 'seconds' },
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: 'font-awesome/fa-clock-o',
+    label: function() {
+      return this.name || `timer ${this.amount || 1} ${this.unit || 'seconds'}`;
+    },
+  });
+</script>

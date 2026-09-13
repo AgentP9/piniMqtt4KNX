@@ -11,6 +11,7 @@ A Docker-based **KNX ↔ MQTT gateway** with a live web traffic dashboard.
 - **MQTT → KNX**: messages received on `<prefix>/<address>` are written back to the corresponding KNX group address
 - **Per-address routing direction**: configure each group address as bidirectional (default), KNX→MQTT only, or MQTT→KNX only
 - **Node-RED-style route rules in the dashboard**: define exact-match KNX→MQTT payload mappings with a visual rule builder instead of raw JSON
+- **Integrated Node-RED editor**: build automations visually with standard MQTT/date-time nodes plus custom KNX, timer and MQTT-state nodes
 - **Repeat publishing**: optionally re-publish the last KNX value to MQTT at a fixed interval until a new KNX message arrives
 - **Web dashboard** (port 3000) showing live telegram traffic, connection status and the configured group addresses
 
@@ -123,6 +124,23 @@ An automation rule that must act on every repeat tick should **subscribe to `…
 
 When editing custom routes in the dashboard, the `valueMap` is exposed as a **visual rule list** (“when KNX value → send MQTT payload”), making it easier to define precise Node-RED-style mappings without manually typing JSON. An advanced JSON field remains available for empty-string keys, whitespace-sensitive keys/payloads, and typed payloads such as numbers, booleans or `null`; when it contains JSON, the visual rule controls are disabled so there is only one active editor for that route.
 
+### Node-RED automation
+
+The integrated Node-RED editor runs inside the same app and reuses the bridge connection state.
+
+Available triggers and outputs:
+
+- Standard Node-RED nodes:
+  - **MQTT in / MQTT out**
+  - **Inject** for date/time triggers
+- Custom `piniMqtt4KNX` nodes:
+  - **`pini-knx in`** – trigger a flow from KNX traffic
+  - **`pini-knx out`** – write flow output back to a KNX group address
+  - **`pini-timer`** – delay or repeat a message
+  - **`pini-mqtt-state`** – read the last MQTT value seen by the bridge for a topic
+
+Node-RED flows are stored under the configured `NODE_RED_USER_DIR` (default: `/app/config/nodered`) so they persist with the rest of the mounted configuration.
+
 ### 3. Run
 
 ```bash
@@ -130,6 +148,8 @@ docker-compose up -d
 ```
 
 Open **http://localhost:3000** for the live dashboard.
+
+Open **http://localhost:3000/red/** for the integrated Node-RED editor.
 
 ---
 
@@ -145,6 +165,10 @@ Open **http://localhost:3000** for the live dashboard.
 | `MQTT_PASSWORD`        | _(empty)_      | MQTT password (optional)                 |
 | `MQTT_TOPIC_PREFIX`    | `knx`          | Topic prefix (`knx/9/0/1`)               |
 | `WEB_PORT`             | `3000`         | Web dashboard port (host-side)           |
+| `NODE_RED_ADMIN_ROOT`  | `/red`         | Node-RED editor path                     |
+| `NODE_RED_HTTP_NODE_ROOT` | `/red/api`  | Node-RED HTTP node path                  |
+| `NODE_RED_USER_DIR`    | `/app/config/nodered` | Node-RED user data + flows         |
+| `NODE_RED_FLOW_FILE`   | `flows.json`   | Flow file inside the Node-RED user dir   |
 | `GROUP_ADDRESSES_PATH` | `/app/config/groupaddresses.json` | Path inside container |
 
 ---
@@ -175,6 +199,9 @@ piniMqtt4KNX/
 │   ├── config.js         # Configuration loader (env vars + JSON file)
 │   ├── knxHandler.js     # KNXnet/IP connection & DPT encode/decode
 │   ├── mqttHandler.js    # MQTT connection & pub/sub
+│   ├── nodeRedServer.js  # Embedded Node-RED runtime
+│   ├── nodeRedRuntimeContext.js # Shared runtime state for custom Node-RED nodes
+│   ├── nodered/nodes/    # Custom KNX/timer/MQTT-state Node-RED nodes
 │   └── webServer.js      # Express + Socket.io dashboard server
 ├── public/
 │   └── index.html        # Live dashboard (Bootstrap 5 + Socket.io)

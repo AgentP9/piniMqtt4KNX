@@ -110,6 +110,7 @@ class MqttHandler extends EventEmitter {
     const payload = typeof value === 'object' ? JSON.stringify(value) : String(value);
     this.client.publish(topic, payload, { retain: false });
     console.log(`[MQTT] Publish ${topic} = ${payload}`);
+    this.emit('published', { topic, value: payload });
   }
 
   /**

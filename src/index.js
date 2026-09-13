@@ -4,6 +4,7 @@ const EventEmitter = require('events');
 const config = require('./config');
 const KnxHandler = require('./knxHandler');
 const MqttHandler = require('./mqttHandler');
+const { NodeRedServer } = require('./nodeRedServer');
 const WebServer = require('./webServer');
 
 const eventEmitter = new EventEmitter();
@@ -14,6 +15,20 @@ const webServer = new WebServer(config.webPort, eventEmitter, config.groupAddres
 // ── Connections ────────────────────────────────────────────────────────────────
 const knxHandler = new KnxHandler(config.knx, config.groupAddresses);
 const mqttHandler = new MqttHandler(config.mqtt, config.topicPrefix);
+const nodeRedServer = new NodeRedServer(webServer.app, webServer.server, {
+  eventEmitter,
+  mqttHandler,
+  knxHandler,
+  config,
+}); // eslint-disable-line no-unused-vars
+
+nodeRedServer.start().catch((err) => {
+  console.error('[NODE-RED] Failed to start:', err && err.stack ? err.stack : err);
+});
+
+mqttHandler.on('error', (err) => {
+  console.error('[MQTT] Bridge error:', err.message);
+});
 
 // ── Repeat-publish timers ──────────────────────────────────────────────────────
 
