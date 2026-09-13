@@ -4,13 +4,15 @@
   "description": "Docker-based KNX ↔ MQTT gateway with web traffic dashboard",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test": "node --test"
   },
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
     "knx": "^2.5.0",
     "mqtt": "^4.3.7",
+    "node-red": "^5.0.7",
     "socket.io": "^4.6.1"
   }
 }

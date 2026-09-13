@@ -1,0 +1,32 @@
+<script type="text/x-red" data-template-name="pini-mqtt-state">
+  <div class="form-row">
+    <label for="node-input-topic"><i class="fa fa-rss"></i> Topic</label>
+    <input type="text" id="node-input-topic" placeholder="Leave blank to use msg.topic">
+  </div>
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="Optional label">
+  </div>
+</script>
+
+<script type="text/x-red" data-help-name="pini-mqtt-state">
+  <p>Looks up the last MQTT payload seen by the bridge for a topic and stores it in <code>msg.mqttState</code>.</p>
+  <p>Use it after a trigger node when a flow needs the current broker state before deciding what to do next.</p>
+</script>
+
+<script type="text/javascript">
+  RED.nodes.registerType('pini-mqtt-state', {
+    category: 'piniMqtt4KNX',
+    color: '#d1e7dd',
+    defaults: {
+      name: { value: '' },
+      topic: { value: '' },
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: 'font-awesome/fa-database',
+    label: function() {
+      return this.name || this.topic || 'pini-mqtt-state';
+    },
+  });
+</script>
